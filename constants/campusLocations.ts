@@ -184,7 +184,7 @@ export const MOCK_REPORTS: Report[] = [
   r("loc-friley", 5, 5, 1, 4, 7, "Packed for dinner."),
   r("loc-friley", 4, 5, 2, 4, 25),
 
-  // State Gym — overstimulating
+  // State Gym — loud
   r("loc-stategym", 5, 4, 3, 5, 9),
   r("loc-stategym", 4, 5, 2, 5, 33),
 

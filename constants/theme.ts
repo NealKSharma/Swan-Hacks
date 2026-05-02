@@ -21,7 +21,7 @@ export const colors = {
   quiet: "#3F8F6E",
   moderate: "#C8A04A",
   busy: "#B86E3C",
-  overstimulating: "#9C2A39",
+  loud: "#9C2A39",
 
   // ISU accents
   cardinal: "#C8102E",          // primary action

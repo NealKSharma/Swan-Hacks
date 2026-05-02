@@ -34,7 +34,7 @@ export default function AboutScreen() {
         </Bullet>
         <Bullet>
           We aggregate recent reports into a sensory comfort score and a plain
-          status label — Quiet, Moderate, Busy, or Overstimulating.
+          status label — Quiet, Moderate, Busy, or Loud.
         </Bullet>
         <Bullet>
           Your preferences tilt recommendations toward spaces that fit you.

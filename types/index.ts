@@ -46,7 +46,7 @@ export interface HourlyTrend {
   sample_count: number;
 }
 
-export type SensoryStatus = "Quiet" | "Moderate" | "Busy" | "Overstimulating";
+export type SensoryStatus = "Quiet" | "Moderate" | "Busy" | "Loud";
 
 export interface SensorySummary {
   status: SensoryStatus;

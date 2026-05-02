@@ -48,7 +48,7 @@ export function statusFromScore(score: number): SensoryStatus {
   if (score >= 75) return "Quiet";
   if (score >= 55) return "Moderate";
   if (score >= 35) return "Busy";
-  return "Overstimulating";
+  return "Loud";
 }
 
 export function summarizeReports(reports: Report[]): SensorySummary {

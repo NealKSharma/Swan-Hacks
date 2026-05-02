@@ -47,17 +47,3 @@ export function metricIconName(
   }
 }
 
-export function statusIconName(
-  status: "Quiet" | "Moderate" | "Busy" | "Overstimulating"
-): IconName {
-  switch (status) {
-    case "Quiet":
-      return "status-quiet";
-    case "Moderate":
-      return "status-moderate";
-    case "Busy":
-      return "status-busy";
-    case "Overstimulating":
-      return "status-loud";
-  }
-}

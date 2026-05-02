@@ -13,8 +13,10 @@ module.exports = function (api) {
           extensions: [".ts", ".tsx", ".js", ".jsx", ".json"],
         },
       ],
-      // Reanimated plugin must be last
-      "react-native-reanimated/plugin",
+      // Worklets plugin must be last. Reanimated 4 split the babel plugin
+      // out into the react-native-worklets package, so this replaces the
+      // old "react-native-reanimated/plugin" path.
+      "react-native-worklets/plugin",
     ],
   };
 };

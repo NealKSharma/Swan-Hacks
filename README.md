@@ -196,21 +196,21 @@ The app uses inline Lucide-style SVG icons via `react-native-svg`, mapped throug
 The `react-native-svg-transformer` config in `metro.config.js` makes any
 `.svg` import work as a React component automatically.
 
-### Icon names you'll need (one SVG per name)
+### Icon names
 
-| Filename                            | Used for                           | Suggested Lucide icon |
-| ----------------------------------- | ---------------------------------- | --------------------- |
-| `status-quiet.svg`                  | Sensory status pill — Quiet        | `leaf`                |
-| `status-moderate.svg`               | Sensory status pill — Moderate     | `cloud-sun`           |
-| `status-busy.svg`                   | Sensory status pill — Busy         | `activity`            |
-| `status-loud.svg`                   | Sensory status pill — Overstim.    | `triangle-alert`      |
-| `metric-noise.svg`                  | Metric badge — Noise               | `volume-2`            |
-| `metric-crowd.svg`                  | Metric badge — Crowd               | `users`               |
-| `metric-seating.svg`                | Metric badge — Seating             | `armchair`            |
-| `metric-lighting.svg`               | Metric badge — Lighting            | `lamp`                |
-| `chevron-right.svg`                 | "See all" / forward CTAs           | `chevron-right`       |
+| Filename               | Used for                                |
+| ---------------------- | --------------------------------------- |
+| `metric-noise.svg`     | Metric badge — Noise                    |
+| `metric-crowd.svg`     | Metric badge — Crowd                    |
+| `metric-seating.svg`   | Metric badge — Seating                  |
+| `metric-lighting.svg`  | Metric badge — Lighting                 |
+| `chevron-right.svg`    | Forward CTAs / "Read more" / arrows     |
+| `nav-home.svg`         | Tab bar — Home                          |
+| `nav-compass.svg`      | Tab bar — Spaces                        |
+| `nav-filter.svg`       | Tab bar — Preferences                   |
+| `nav-info.svg`         | Tab bar — About                         |
 
-Grab them from <https://lucide.dev> (MIT-licensed, click an icon → "Copy SVG").
+All SVGs use `fill="currentColor"` so they tint via the `color` prop on `<Icon>`.
 
 ## File reference
 

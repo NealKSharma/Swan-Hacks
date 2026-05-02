@@ -1,5 +1,12 @@
+import { useEffect } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { Icon, IconName } from "@/components/Icon";
 import { colors } from "@/constants/theme";
@@ -27,11 +34,11 @@ export function PillTabBar({ state, descriptors, navigation }: BottomTabBarProps
           const label = descriptors[route.key]?.options.title ?? route.name;
 
           return (
-            <Pressable
+            <TabItem
               key={route.key}
-              accessibilityRole="button"
-              accessibilityState={focused ? { selected: true } : {}}
-              accessibilityLabel={label}
+              focused={focused}
+              iconName={iconName}
+              label={label}
               onPress={() => {
                 const event = navigation.emit({
                   type: "tabPress",
@@ -42,18 +49,7 @@ export function PillTabBar({ state, descriptors, navigation }: BottomTabBarProps
                   navigation.navigate(route.name, route.params);
                 }
               }}
-              style={({ pressed }) => [
-                styles.item,
-                pressed && { transform: [{ scale: 0.96 }] },
-              ]}
-            >
-              {focused && <View style={styles.activeBg} />}
-              <Icon
-                name={iconName}
-                size={22}
-                color={focused ? "#FFFFFF" : "rgba(255,255,255,0.6)"}
-              />
-            </Pressable>
+            />
           );
         })}
       </View>
@@ -61,7 +57,68 @@ export function PillTabBar({ state, descriptors, navigation }: BottomTabBarProps
   );
 }
 
-const ACTIVE_BG = 48;
+function TabItem({
+  focused,
+  iconName,
+  label,
+  onPress,
+}: {
+  focused: boolean;
+  iconName: IconName;
+  label: string;
+  onPress: () => void;
+}) {
+  // 0 → inactive, 1 → active. Drives the active circle + icon scale.
+  const progress = useSharedValue(focused ? 1 : 0);
+  const press = useSharedValue(0);
+
+  useEffect(() => {
+    progress.value = withSpring(focused ? 1 : 0, {
+      damping: 16,
+      stiffness: 220,
+      mass: 0.7,
+    });
+  }, [focused, progress]);
+
+  const bgStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ scale: 0.55 + 0.45 * progress.value }],
+  }));
+
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: 1 + 0.1 * progress.value - 0.06 * press.value },
+      { translateY: -2 * progress.value },
+    ],
+  }));
+
+  return (
+    <Pressable
+      onPressIn={() => {
+        press.value = withTiming(1, { duration: 90 });
+      }}
+      onPressOut={() => {
+        press.value = withTiming(0, { duration: 160 });
+      }}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={focused ? { selected: true } : {}}
+      accessibilityLabel={label}
+      style={styles.item}
+    >
+      <Animated.View style={[styles.activeBg, bgStyle]} />
+      <Animated.View style={iconStyle}>
+        <Icon
+          name={iconName}
+          size={26}
+          color={focused ? "#FFFFFF" : "rgba(255,255,255,0.6)"}
+        />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+const ACTIVE_BG = 56;
 
 const styles = StyleSheet.create({
   wrap: {
@@ -86,7 +143,7 @@ const styles = StyleSheet.create({
   },
   item: {
     flex: 1,
-    height: 56,
+    height: 64,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -95,6 +152,6 @@ const styles = StyleSheet.create({
     width: ACTIVE_BG,
     height: ACTIVE_BG,
     borderRadius: ACTIVE_BG / 2,
-    backgroundColor: "rgba(255,255,255,0.16)",
+    backgroundColor: "rgba(255,255,255,0.18)",
   },
 });
