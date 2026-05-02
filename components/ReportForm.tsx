@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Audio } from "expo-av";
 import { colors, radii, spacing, typography } from "@/constants/theme";
 import { Button } from "@/components/Button";
 import { levelLabel } from "@/utils/formatting";
@@ -18,6 +19,28 @@ interface Props {
 }
 
 const LEVELS: Level[] = [1, 2, 3, 4, 5];
+const NOISE_MEASURE_MS = 2000;
+const NOISE_SAMPLE_MS = 100;
+
+function noiseLevelFromMetering(db: number): { label: string; level: Level } {
+  const clamped = Math.max(-80, Math.min(0, db));
+
+  const score = Math.round(((clamped + 80) / 80) * 100);
+
+  if (score < 35) {
+    return { label: "Quiet", level: 1 };
+  }
+
+  if (score < 65) {
+    return { label: "Moderate", level: 3 };
+  }
+
+  return { label: "Loud", level: 5 };
+}
+
+function ensureReportLevel(level: Level): Level {
+  return Math.min(5, Math.max(1, level)) as Level;
+}
 
 export function ReportForm({ locationId, onSubmitted }: Props) {
   const [noise, setNoise] = useState<Level>(3);
@@ -28,14 +51,33 @@ export function ReportForm({ locationId, onSubmitted }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [measuringNoise, setMeasuringNoise] = useState(false);
+  const [detectedNoise, setDetectedNoise] = useState<{ label: string; db: number } | null>(null);
+  const noiseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const noiseRecordingRef = useRef<Audio.Recording | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (noiseTimerRef.current) {
+        clearTimeout(noiseTimerRef.current);
+        noiseTimerRef.current = null;
+      }
+
+      if (noiseRecordingRef.current) {
+        void discardNoiseRecording(noiseRecordingRef.current);
+        noiseRecordingRef.current = null;
+      }
+    };
+  }, []);
 
   async function handleSubmit() {
     setSubmitting(true);
     setError(null);
     try {
+      const reportNoiseLevel = ensureReportLevel(noise);
       const payload: NewReport = {
         location_id: locationId,
-        noise_level: noise,
+        noise_level: reportNoiseLevel,
         crowd_level: crowd,
         seating_level: seating,
         lighting_level: lighting,
@@ -50,6 +92,77 @@ export function ReportForm({ locationId, onSubmitted }: Props) {
       setError(e instanceof Error ? e.message : "Could not submit report.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleMeasureNoise() {
+    let recording: Audio.Recording | null = null;
+
+    setMeasuringNoise(true);
+    setError(null);
+    setDetectedNoise(null);
+
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+
+      if (!permission.granted) {
+        setError("Microphone permission is needed to measure noise.");
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      let maxDb = Number.NEGATIVE_INFINITY;
+      recording = new Audio.Recording();
+      noiseRecordingRef.current = recording;
+
+      await recording.prepareToRecordAsync({
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        isMeteringEnabled: true,
+      });
+
+      recording.setProgressUpdateInterval(NOISE_SAMPLE_MS);
+      recording.setOnRecordingStatusUpdate((status: { isRecording: boolean; metering?: number }) => {
+        if (status.isRecording && typeof status.metering === "number") {
+          maxDb = Math.max(maxDb, status.metering);
+        }
+      });
+
+      await recording.startAsync();
+      await new Promise<void>((resolve) => {
+        noiseTimerRef.current = setTimeout(resolve, NOISE_MEASURE_MS);
+      });
+
+      const status = await recording.getStatusAsync();
+      if (typeof status.metering === "number") {
+        maxDb = Math.max(maxDb, status.metering);
+      }
+
+      if (!Number.isFinite(maxDb)) {
+        throw new Error("Could not read the microphone level.");
+      }
+
+      const roundedDb = Math.round(maxDb);
+      const detected = noiseLevelFromMetering(roundedDb);
+      setNoise(detected.level);
+      setDetectedNoise({ label: detected.label, db: roundedDb });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not measure noise.");
+    } finally {
+      if (noiseTimerRef.current) {
+        clearTimeout(noiseTimerRef.current);
+        noiseTimerRef.current = null;
+      }
+
+      if (recording) {
+        await discardNoiseRecording(recording);
+        noiseRecordingRef.current = null;
+      }
+
+      setMeasuringNoise(false);
     }
   }
 
@@ -80,6 +193,19 @@ export function ReportForm({ locationId, onSubmitted }: Props) {
         leftCue="Silent"
         rightCue="Very loud"
       />
+      <View style={styles.measureBlock}>
+        <Button
+          label={measuringNoise ? "Measuring..." : "Measure Noise (2s)"}
+          onPress={handleMeasureNoise}
+          disabled={measuringNoise || submitting}
+          variant="ghost"
+        />
+        {detectedNoise && (
+          <Text style={styles.detectedNoise}>
+            Detected: {detectedNoise.label} ({detectedNoise.db} dB)
+          </Text>
+        )}
+      </View>
       <Field
         label="Crowd"
         helper={`Currently: ${levelLabel("crowd", crowd)}`}
@@ -129,6 +255,23 @@ export function ReportForm({ locationId, onSubmitted }: Props) {
       />
     </View>
   );
+}
+
+async function discardNoiseRecording(recording: Audio.Recording) {
+  recording.setOnRecordingStatusUpdate(null);
+
+  try {
+    const status = await recording.getStatusAsync();
+    if (status.canRecord || status.isRecording) {
+      await recording.stopAndUnloadAsync();
+    }
+  } catch {
+    try {
+      await recording.stopAndUnloadAsync();
+    } catch {
+      // The temporary recording is intentionally discarded.
+    }
+  }
 }
 
 interface FieldProps {
@@ -212,6 +355,8 @@ const styles = StyleSheet.create({
   dotLabelSelected: { color: "#FFFFFF" },
   cues: { flexDirection: "row", justifyContent: "space-between" },
   cue: { ...typography.caption, color: colors.textMuted },
+  measureBlock: { gap: spacing.xs },
+  detectedNoise: { ...typography.small, color: colors.textSubtle },
   input: {
     backgroundColor: colors.surface,
     borderWidth: 1,

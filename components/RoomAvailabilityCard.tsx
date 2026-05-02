@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "@/components/Button";
 import { colors, radii, spacing, typography } from "@/constants/theme";
@@ -10,8 +10,26 @@ interface Props {
   loading: boolean;
 }
 
+const EMPTY_GROUPS: RoomAvailabilityResponse["groups"] = [];
+
 export function RoomAvailabilityCard({ availability, loading }: Props) {
-  const groups = availability?.groups ?? [];
+  const groups = useMemo(
+    () => availability?.groups ?? EMPTY_GROUPS,
+    [availability?.groups]
+  );
+  const firstGroupKey = groups[0]?.key ?? "";
+  const [selectedGroupKey, setSelectedGroupKey] = useState(
+    firstGroupKey
+  );
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setSelectedGroupKey((current) =>
+      current === firstGroupKey ? current : firstGroupKey
+    );
+    setExpandedGroups({});
+  }, [firstGroupKey]);
+
   if (loading) {
     return (
       <View style={styles.card}>
@@ -20,16 +38,6 @@ export function RoomAvailabilityCard({ availability, loading }: Props) {
       </View>
     );
   }
-
-  const [selectedGroupKey, setSelectedGroupKey] = useState(
-    groups[0]?.key ?? ""
-  );
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    setSelectedGroupKey(groups[0]?.key ?? "");
-    setExpandedGroups({});
-  }, [groups]);
 
   if (!availability) return null;
 
