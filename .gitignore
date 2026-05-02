@@ -9,3 +9,4 @@ web-build/
 ios/
 android/
 .eas/
+supabase/.temp/
