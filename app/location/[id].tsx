@@ -1,0 +1,221 @@
+import { useCallback, useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { Screen } from "@/components/Screen";
+import { Button } from "@/components/Button";
+import { MetricBadge } from "@/components/MetricBadge";
+import { SensoryStatusPill } from "@/components/SensoryStatusPill";
+import { TrendBars } from "@/components/TrendBars";
+import { ReportForm } from "@/components/ReportForm";
+import { colors, radii, spacing, typography } from "@/constants/theme";
+import {
+  getLocationBySlugOrId,
+  listRecentReports,
+  listTrends,
+} from "@/lib/dataSource";
+import { summarizeReports } from "@/utils/sensoryScore";
+import { timeAgo } from "@/utils/formatting";
+import type { HourlyTrend, Location, Report, SensorySummary } from "@/types";
+
+export default function LocationDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const [location, setLocation] = useState<Location | null>(null);
+  const [summary, setSummary] = useState<SensorySummary | null>(null);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [trends, setTrends] = useState<HourlyTrend[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    if (!id) return;
+    const loc = await getLocationBySlugOrId(id);
+    if (!loc) {
+      setLocation(null);
+      setLoading(false);
+      return;
+    }
+    const [recent, trendData] = await Promise.all([
+      listRecentReports(loc.id, 120, 25),
+      listTrends(loc.id),
+    ]);
+    setLocation(loc);
+    setReports(recent);
+    setTrends(trendData);
+    setSummary(summarizeReports(recent));
+    setLoading(false);
+  }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
+
+  if (loading) {
+    return (
+      <Screen>
+        <Text style={styles.muted}>Loading…</Text>
+      </Screen>
+    );
+  }
+
+  if (!location || !summary) {
+    return (
+      <Screen>
+        <Stack.Screen options={{ title: "Not found" }} />
+        <Text style={styles.muted}>
+          We couldn&apos;t find that location. The QR code may be out of date.
+        </Text>
+      </Screen>
+    );
+  }
+
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const hour = now.getHours();
+
+  return (
+    <Screen>
+      <Stack.Screen options={{ title: location.name }} />
+
+      <View style={styles.header}>
+        <Text style={styles.category}>{location.category}</Text>
+        <Text style={styles.title}>{location.name}</Text>
+        <View style={{ flexDirection: "row" }}>
+          <SensoryStatusPill status={summary.status} size="lg" />
+        </View>
+        <Text style={styles.updated}>
+          {summary.reportCount > 0
+            ? `${summary.reportCount} report${summary.reportCount === 1 ? "" : "s"} • Updated ${timeAgo(summary.lastReportedAt)}`
+            : "No recent reports yet"}
+        </Text>
+      </View>
+
+      {location.description && (
+        <Text style={styles.description}>{location.description}</Text>
+      )}
+
+      <View style={styles.metricsGrid}>
+        <MetricBadge metric="noise" value={summary.noise} />
+        <MetricBadge metric="crowd" value={summary.crowd} />
+        <MetricBadge metric="seating" value={summary.seating} />
+        <MetricBadge metric="lighting" value={summary.lighting} />
+      </View>
+
+      {location.accessibility_notes && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Accessibility</Text>
+          <Text style={styles.cardBody}>{location.accessibility_notes}</Text>
+        </View>
+      )}
+
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardTitle}>Popular times today</Text>
+          <Text style={styles.cardCaption}>{dayLabel(dayOfWeek)}</Text>
+        </View>
+        <TrendBars trends={trends} dayOfWeek={dayOfWeek} highlightHour={hour} />
+        <Text style={styles.cardCaptionSubtle}>
+          Based on aggregated reports. Fills in as more students contribute.
+        </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Recent anonymous reports</Text>
+        {reports.length === 0 ? (
+          <Text style={styles.cardBodyMuted}>
+            No reports in the last two hours. Be the first.
+          </Text>
+        ) : (
+          reports.slice(0, 6).map((r) => (
+            <View key={r.id} style={styles.reportRow}>
+              <Text style={styles.reportTime}>{timeAgo(r.created_at)}</Text>
+              <Text style={styles.reportLine}>
+                Noise {r.noise_level}/5 • Crowd {r.crowd_level}/5 • Seating {r.seating_level}/5
+              </Text>
+              {r.comment && <Text style={styles.reportComment}>“{r.comment}”</Text>}
+            </View>
+          ))
+        )}
+      </View>
+
+      {showForm ? (
+        <View style={styles.card}>
+          <ReportForm
+            locationId={location.id}
+            onSubmitted={() => {
+              load();
+            }}
+          />
+          <Pressable onPress={() => setShowForm(false)} accessibilityRole="button">
+            <Text style={styles.cancelLink}>Close</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <Button
+          label="Submit a quick report"
+          variant="cardinal"
+          onPress={() => setShowForm(true)}
+        />
+      )}
+    </Screen>
+  );
+}
+
+function dayLabel(d: number): string {
+  return (
+    ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d] ??
+    "Today"
+  );
+}
+
+const styles = StyleSheet.create({
+  header: { gap: spacing.sm },
+  category: {
+    ...typography.caption,
+    color: colors.cardinal,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+  },
+  title: { ...typography.display, color: colors.text },
+  updated: { ...typography.small, color: colors.textMuted },
+  description: { ...typography.body, color: colors.textSubtle },
+  metricsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  cardHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+  },
+  cardTitle: { ...typography.heading, color: colors.text },
+  cardCaption: { ...typography.small, color: colors.textSubtle },
+  cardCaptionSubtle: { ...typography.small, color: colors.textMuted },
+  cardBody: { ...typography.body, color: colors.textSubtle },
+  cardBodyMuted: { ...typography.body, color: colors.textMuted },
+  reportRow: {
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 2,
+  },
+  reportTime: { ...typography.caption, color: colors.textMuted },
+  reportLine: { ...typography.body, color: colors.text },
+  reportComment: { ...typography.small, color: colors.textSubtle, fontStyle: "italic" },
+  cancelLink: { ...typography.bodyStrong, color: colors.accent, textAlign: "center" },
+  muted: { ...typography.body, color: colors.textMuted },
+});

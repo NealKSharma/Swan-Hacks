@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "CySense",
+    "slug": "cysense",
+    "scheme": "cysense",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#F6F4EE"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "edu.iastate.cysense",
+      "associatedDomains": ["applinks:cysense.app"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": false
+    }
+  }
+}
