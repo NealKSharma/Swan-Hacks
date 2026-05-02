@@ -1,7 +1,7 @@
 // CySense theme.
 //
 // Calm, sensory-friendly base with cardinal red as the primary action color
-// and gold as a secondary accent. The palette is intentionally restrained —
+// and gold as a secondary accent. The palette is intentionally restrained .
 // most of the app is white and warm-neutral, with cardinal showing up only on
 // CTAs, active states, and key emphasis.
 
@@ -17,7 +17,7 @@ export const colors = {
   textSubtle: "#5A6472",
   textMuted: "#8A93A0",
 
-  // Sensory status (paired with icons + labels — never color-only)
+  // Sensory status (paired with icons + labels. never color-only)
   quiet: "#3F8F6E",
   moderate: "#C8A04A",
   busy: "#B86E3C",
@@ -30,7 +30,7 @@ export const colors = {
   gold: "#F1BE48",              // secondary accent
   goldSoft: "#FBF0D0",          // subtle accent backgrounds
 
-  // Functional aliases — these used to point at a calm blue.
+  // Functional aliases. these used to point at a calm blue.
   // Now they map to cardinal so the whole app picks up the new primary.
   accent: "#C8102E",
   accentSoft: "#FBE5E8",

@@ -20,7 +20,7 @@ export default function AboutScreen() {
         <Text style={styles.title}>CySense</Text>
         <Text style={styles.body}>
           CySense is a sensory-aware campus companion built by Iowa State students.
-          It helps you find calmer, less crowded, more usable spaces — useful for
+          It helps you find calmer, less crowded, more usable spaces. Useful for
           students with sensory sensitivities, neurodivergent students, anyone
           easily overwhelmed by loud or crowded environments, and really anyone
           looking for a better study spot.
@@ -34,7 +34,7 @@ export default function AboutScreen() {
         </Bullet>
         <Bullet>
           We aggregate recent reports into a sensory comfort score and a plain
-          status label — Quiet, Moderate, Busy, or Loud.
+          status label: Quiet, Moderate, Busy, or Loud.
         </Bullet>
         <Bullet>
           Your preferences tilt recommendations toward spaces that fit you.
@@ -46,26 +46,29 @@ export default function AboutScreen() {
       </Section>
 
       <Section title="Privacy principles">
-        <Bullet>No accounts required. No tracking of individual students.</Bullet>
+        <Bullet>No accounts required. We never store who you are.</Bullet>
         <Bullet>
-          Reports are anonymous and aggregated. We do not store personal location
-          histories.
+          Reports are anonymous and aggregated. No identity is ever attached to
+          a noise, crowd, seating, or lighting reading.
         </Bullet>
         <Bullet>
-          We use predefined campus zones, not continuous GPS trails.
+          We resolve location to coarse campus zones. Your zone presence is
+          recorded, but not the continuous path between them.
         </Bullet>
-        <Bullet>No raw audio is recorded or stored — ever.</Bullet>
         <Bullet>
-          If we add density estimation later, it will be opt-in, aggregated by
+          Decibel readings happen on-device. Only the number leaves your phone;
+          no raw audio is recorded, stored, or transmitted.
+        </Bullet>
+        <Bullet>
+          Density estimation, if added later, will be opt-in, aggregated by
           zone, and never tied to identity.
         </Bullet>
       </Section>
 
       <Section title="Future vision">
         <Bullet>Aggregated, opt-in location density.</Bullet>
-        <Bullet>Campus-installed decibel readers in select hotspots.</Bullet>
         <Bullet>More accurate historical predictions as data grows.</Bullet>
-        <Bullet>QR codes at building entrances — scan to view conditions.</Bullet>
+        <Bullet>QR codes at building entrances. Scan to view conditions.</Bullet>
         <Bullet>Optional accounts for personalized alerts.</Bullet>
         <Bullet>Sensory-friendly route planning between buildings.</Bullet>
         <Bullet>A community board for location-specific anonymous notes.</Bullet>
@@ -74,7 +77,7 @@ export default function AboutScreen() {
       <Section title="On-device sound classification (future)">
         <Text style={styles.body}>
           We&apos;re exploring a short, on-device sound sample to classify environment
-          noise — but only if it can be done locally with no raw audio leaving the
+          noise, but only if it can be done locally with no raw audio leaving the
           phone. Until that&apos;s feasible and clearly privacy-safe, manual reports stay.
         </Text>
       </Section>

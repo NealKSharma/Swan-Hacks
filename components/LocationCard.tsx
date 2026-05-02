@@ -47,7 +47,7 @@ export function LocationCard({ location, summary, reasons }: Props) {
         <Text style={styles.footer}>
           {summary.reportCount > 0
             ? `${summary.reportCount} report${summary.reportCount === 1 ? "" : "s"} • Updated ${timeAgo(summary.lastReportedAt)}`
-            : "No recent reports — tap to be the first"}
+            : "No recent reports. Tap to be the first."}
         </Text>
       </Pressable>
     </Link>

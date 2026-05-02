@@ -102,7 +102,7 @@ export const MOCK_LOCATIONS: Location[] = [
     latitude: 42.026,
     longitude: -93.6541,
     accessibility_notes:
-      "Step-free entry. Elevators to upper floors. Adaptive equipment available — ask at the desk.",
+      "Step-free entry. Elevators to upper floors. Adaptive equipment available. Ask at the desk.",
     created_at: ISO_NOW(),
   },
   {
@@ -160,7 +160,7 @@ export const MOCK_LOCATIONS: Location[] = [
     latitude: 42.0265,
     longitude: -93.6485,
     accessibility_notes:
-      "Paved paths throughout. Benches at intervals. No covered shelter — weather-dependent.",
+      "Paved paths throughout. Benches at intervals. No covered shelter; weather-dependent.",
     created_at: ISO_NOW(),
   },
 ];
@@ -168,17 +168,17 @@ export const MOCK_LOCATIONS: Location[] = [
 // A handful of recent reports per location to make the demo feel alive.
 // Quieter places (library, lago) have low noise/crowd; busy places (MU, gym, dining) skew high.
 export const MOCK_REPORTS: Report[] = [
-  // Parks Library — currently busy/noisy (story: student decides to go elsewhere)
+  // Parks Library. currently busy/noisy (story: student decides to go elsewhere)
   r("loc-parks", 4, 4, 2, 4, 8, "Finals week energy, hard to focus."),
   r("loc-parks", 3, 4, 2, 4, 22),
   r("loc-parks", 4, 5, 1, 4, 35),
 
-  // SIC — currently calm (story: student picks this instead)
+  // SIC. currently calm (story: student picks this instead)
   r("loc-sic", 2, 2, 4, 3, 6, "2nd floor nooks are open."),
   r("loc-sic", 1, 2, 5, 3, 19),
   r("loc-sic", 2, 1, 4, 3, 41),
 
-  // Memorial Union — moderate
+  // Memorial Union. moderate
   r("loc-mu", 3, 3, 3, 4, 12),
   r("loc-mu", 4, 4, 2, 4, 30, "Lunch rush starting."),
 
@@ -189,27 +189,27 @@ export const MOCK_REPORTS: Report[] = [
   // Troxel
   r("loc-troxel", 1, 1, 5, 2, 10, "Empty between lectures."),
 
-  // Friley dining — very busy
+  // Friley dining. very busy
   r("loc-friley", 5, 5, 1, 4, 7, "Packed for dinner."),
   r("loc-friley", 4, 5, 2, 4, 25),
 
-  // State Gym — loud
+  // State Gym. loud
   r("loc-stategym", 5, 4, 3, 5, 9),
   r("loc-stategym", 4, 5, 2, 5, 33),
 
-  // Design — moderate, sound-carrying
+  // Design. moderate, sound-carrying
   r("loc-design", 3, 3, 3, 3, 16),
 
-  // Howe — calm
+  // Howe. calm
   r("loc-howe", 2, 1, 5, 3, 11),
 
-  // Curtiss — moderate
+  // Curtiss. moderate
   r("loc-curtiss", 3, 3, 3, 3, 26),
 
-  // Lago — quiet
+  // Lago. quiet
   r("loc-lago", 1, 2, 4, 2, 13, "Courtyard lounge open."),
 
-  // Central campus — moderate, bright
+  // Central campus. moderate, bright
   r("loc-central", 2, 3, 4, 5, 17, "Sunny and warm out."),
 ];
 
@@ -235,7 +235,7 @@ function r(
   };
 }
 
-// Mock weekday hourly trends — same shape as the SQL seed, used for the
+// Mock weekday hourly trends. same shape as the SQL seed, used for the
 // "popular times" bars when Supabase is not configured.
 export const MOCK_TRENDS: HourlyTrend[] = (() => {
   const out: HourlyTrend[] = [];

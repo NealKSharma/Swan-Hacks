@@ -43,7 +43,7 @@ if (looksConfigured(url) && !isValidSupabaseUrl(url)) {
   console.warn(
     "[supabase] EXPO_PUBLIC_SUPABASE_URL looks malformed:",
     JSON.stringify(url),
-    "— expected https://YOUR-PROJECT.supabase.co with no extra path. Falling back to mock data."
+    "Expected https://YOUR-PROJECT.supabase.co with no extra path. Falling back to mock data."
   );
 }
 

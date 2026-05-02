@@ -68,7 +68,7 @@ export function ReportForm({ locationId, onSubmitted }: Props) {
   return (
     <View style={styles.form}>
       <Text style={styles.intro}>
-        How does this place feel right now? Reports are anonymous — no account, no
+        How does this place feel right now? Reports are anonymous. No account, no
         location tracking.
       </Text>
 

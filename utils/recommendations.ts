@@ -80,9 +80,5 @@ function preferenceFit(
     }
   }
 
-  if (summary.reportCount === 0) {
-    reasons.push("No recent reports yet");
-  }
-
   return { fit: Math.max(0, Math.min(100, score)), reasons };
 }

@@ -55,7 +55,7 @@ export function TrendBars({
       </View>
       {empty && (
         <Text style={styles.emptyHint}>
-          Not enough reports yet — trends fill in as students contribute.
+          Not enough reports yet. Trends fill in as students contribute.
         </Text>
       )}
     </View>
