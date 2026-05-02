@@ -1,11 +1,30 @@
 # CySense
 
 A sensory-aware campus companion for Iowa State University. It helps students
-find calmer, less crowded, more usable spaces using crowdsourced live and
-historical information about noise, crowd density, seating, lighting, and now
-live study-room openings where LibCal data is available.
+find calmer, less crowded, more usable spaces using a mix of crowdsourced
+reports, opt-in location signals for zone presence, on-device decibel readings,
+and live study-room openings where LibCal data is available.
 
-Built for Swan Hacks. Privacy-first. No tracking.
+Built for Swan Hacks. Privacy-first by design.
+
+### How privacy works
+
+CySense never requires an account and never stores who submitted a report.
+Three categories of input feed the app, and the two that touch the device
+are strictly opt-in:
+
+1. **Anonymous reports** — what students manually share about a space (noise,
+   crowd, seating, lighting, optional comment). No identity is attached.
+2. **Opt-in location** — if the user grants permission, we resolve their
+   device's location to a coarse campus zone (e.g. "Parks Library"). We do
+   not store exact coordinates and we do not store the path between zones.
+   Tracking is off by default and the app works fine without it.
+3. **On-device decibel** — when a report is submitted, we can measure the
+   ambient decibel level locally on the phone. Only the number leaves the
+   device. No raw audio is ever recorded, transmitted, or stored.
+
+If a user declines location or microphone access, the app still works; only
+manual reports contribute. That is intentional.
 
 ---
 

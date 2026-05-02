@@ -5,7 +5,14 @@ export default function TabsLayout() {
   return (
     <Tabs
       tabBar={(props) => <PillTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{
+        headerShown: false,
+        // Fade between tabs: feels calm, doesn't fight the home's snap-pop
+        // or the about page's pseudo-scroll. Built in via @react-navigation
+        // bottom-tabs v7.
+        animation: "fade",
+        lazy: false,
+      }}
     >
       <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="spaces" options={{ title: "Spaces" }} />

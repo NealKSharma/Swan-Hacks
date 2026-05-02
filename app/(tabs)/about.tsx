@@ -1,99 +1,301 @@
-import { useCallback } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback, useRef } from "react";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from "react-native";
 import { useFocusEffect } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
-import { Screen } from "@/components/Screen";
-import { colors, radii, spacing, typography } from "@/constants/theme";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  Extrapolation,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
+import { colors, spacing, typography } from "@/constants/theme";
+
+const HEADER_BLOCK_HEIGHT = 130;
+const PAGE_COUNT = 4;
+
+const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
 export default function AboutScreen() {
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+
+  const scrollY = useSharedValue(0);
+  const scrollRef = useRef<ScrollView>(null);
+
   useFocusEffect(
     useCallback(() => {
       setStatusBarStyle("dark");
     }, [])
   );
 
+  const onScroll = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+
+  const pageHeight = windowHeight;
+
   return (
-    <Screen contentContainerStyle={{ paddingTop: spacing.xl }}>
-      <View style={styles.header}>
-        <View style={styles.headerBlob} />
-        <Text style={styles.eyebrow}>About</Text>
-        <Text style={styles.title}>CySense</Text>
-        <Text style={styles.body}>
-          CySense is a sensory-aware campus companion built by Iowa State students.
-          It helps you find calmer, less crowded, more usable spaces. Useful for
-          students with sensory sensitivities, neurodivergent students, anyone
-          easily overwhelmed by loud or crowded environments, and really anyone
-          looking for a better study spot.
-        </Text>
+    <View style={styles.canvas}>
+      <View
+        pointerEvents="box-none"
+        style={[styles.persistentHeader, { paddingTop: insets.top + spacing.xl }]}
+      >
+        <Text style={styles.bigAbout}>ABOUT</Text>
+        <View style={styles.aboutRule} />
       </View>
 
-      <Section title="How it works today">
-        <Bullet>
-          Students submit quick, anonymous reports on noise, crowd, seating, and
-          lighting at campus locations.
-        </Bullet>
-        <Bullet>
-          We aggregate recent reports into a sensory comfort score and a plain
-          status label: Quiet, Moderate, Busy, or Loud.
-        </Bullet>
-        <Bullet>
-          Your preferences tilt recommendations toward spaces that fit you.
-        </Bullet>
-        <Bullet>
-          At supported buildings, CySense can also show live study-room openings
-          and send you to the official LibCal reservation page to complete the booking.
-        </Bullet>
-      </Section>
+      <AnimatedScrollView
+        ref={scrollRef}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        pagingEnabled
+        decelerationRate="normal"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        <SnapPage index={0} pageHeight={pageHeight} insets={insets} scrollY={scrollY}>
+          <IntroSlide />
+        </SnapPage>
 
-      <Section title="Privacy principles">
-        <Bullet>No accounts required. We never store who you are.</Bullet>
-        <Bullet>
-          Reports are anonymous and aggregated. No identity is ever attached to
-          a noise, crowd, seating, or lighting reading.
-        </Bullet>
-        <Bullet>
-          We resolve location to coarse campus zones. Your zone presence is
-          recorded, but not the continuous path between them.
-        </Bullet>
-        <Bullet>
-          Decibel readings happen on-device. Only the number leaves your phone;
-          no raw audio is recorded, stored, or transmitted.
-        </Bullet>
-        <Bullet>
-          Density estimation, if added later, will be opt-in, aggregated by
-          zone, and never tied to identity.
-        </Bullet>
-      </Section>
+        <SnapPage index={1} pageHeight={pageHeight} insets={insets} scrollY={scrollY}>
+          <HowItWorksSlide />
+        </SnapPage>
 
-      <Section title="Future vision">
-        <Bullet>Aggregated, opt-in location density.</Bullet>
-        <Bullet>More accurate historical predictions as data grows.</Bullet>
-        <Bullet>QR codes at building entrances. Scan to view conditions.</Bullet>
-        <Bullet>Optional accounts for personalized alerts.</Bullet>
-        <Bullet>Sensory-friendly route planning between buildings.</Bullet>
-        <Bullet>A community board for location-specific anonymous notes.</Bullet>
-      </Section>
+        <SnapPage index={2} pageHeight={pageHeight} insets={insets} scrollY={scrollY}>
+          <PrivacySlide />
+        </SnapPage>
 
-      <Section title="On-device sound classification (future)">
-        <Text style={styles.body}>
-          We&apos;re exploring a short, on-device sound sample to classify environment
-          noise, but only if it can be done locally with no raw audio leaving the
-          phone. Until that&apos;s feasible and clearly privacy-safe, manual reports stay.
-        </Text>
-      </Section>
+        <SnapPage index={3} pageHeight={pageHeight} insets={insets} scrollY={scrollY}>
+          <FutureSlide />
+        </SnapPage>
+      </AnimatedScrollView>
 
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Built for Swan Hacks at Iowa State University.</Text>
-      </View>
-    </Screen>
+      <PageDots count={PAGE_COUNT} scrollY={scrollY} pageHeight={pageHeight} />
+    </View>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+// ----------------------------------------------------------------
+// Snap page — intentionally NOT pinned. Content scrolls with the
+// ScrollView so the swipe reads as paginated scroll, not snap-pop.
+// A gentle scale + opacity falloff softens the page edges.
+// ----------------------------------------------------------------
+
+function SnapPage({
+  index,
+  pageHeight,
+  insets,
+  scrollY,
+  children,
+}: {
+  index: number;
+  pageHeight: number;
+  insets: { top: number; bottom: number };
+  scrollY: Animated.SharedValue<number>;
+  children: React.ReactNode;
+}) {
+  const animStyle = useAnimatedStyle(() => {
+    const distance = Math.abs(scrollY.value / pageHeight - index);
+
+    // No pin-translate: content moves naturally with the scroll position.
+    // Just a soft scale shrink and opacity dim as the page leaves view —
+    // the user feels the scroll, but each page also has a beat where it
+    // crisply snaps to its resting place.
+    const scale = interpolate(
+      distance,
+      [0, 1],
+      [1.0, 0.9],
+      Extrapolation.CLAMP
+    );
+    const opacity = interpolate(
+      distance,
+      [0, 0.6, 1],
+      [1, 0.55, 0.25],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      opacity,
+      transform: [{ scale }],
+    };
+  });
+
   return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>{title}</Text>
-      <View style={{ gap: spacing.sm }}>{children}</View>
+    <View
+      style={{
+        height: pageHeight,
+        paddingTop: insets.top + HEADER_BLOCK_HEIGHT,
+        paddingBottom: insets.bottom + 120,
+        paddingLeft: 28,
+        paddingRight: 44,
+      }}
+    >
+      <Animated.View style={[{ flex: 1, justifyContent: "flex-start" }, animStyle]}>
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
+
+function PageDots({
+  count,
+  scrollY,
+  pageHeight,
+}: {
+  count: number;
+  scrollY: Animated.SharedValue<number>;
+  pageHeight: number;
+}) {
+  return (
+    <View style={styles.pageDots} pointerEvents="none">
+      {Array.from({ length: count }).map((_, i) => (
+        <PageDot key={i} index={i} scrollY={scrollY} pageHeight={pageHeight} />
+      ))}
+    </View>
+  );
+}
+
+function PageDot({
+  index,
+  scrollY,
+  pageHeight,
+}: {
+  index: number;
+  scrollY: Animated.SharedValue<number>;
+  pageHeight: number;
+}) {
+  const animStyle = useAnimatedStyle(() => {
+    const distance = Math.abs(scrollY.value / pageHeight - index);
+    const active = 1 - Math.min(1, distance);
+    return {
+      backgroundColor: active > 0.5 ? colors.cardinal : "rgba(26,31,42,0.22)",
+      height: 12 + 22 * active,
+      opacity: 0.45 + 0.55 * active,
+    };
+  });
+  return <Animated.View style={[styles.pageDot, animStyle]} />;
+}
+
+// ----------------------------------------------------------------
+// Slide eyebrow with a short gold rule beneath it (editorial detail).
+// ----------------------------------------------------------------
+
+function SlideEyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <View style={{ gap: 10 }}>
+      <Text style={styles.sectionEyebrow}>{children}</Text>
+      <View style={styles.eyebrowRule} />
+    </View>
+  );
+}
+
+// ----------------------------------------------------------------
+// Slides
+// ----------------------------------------------------------------
+
+function IntroSlide() {
+  return (
+    <View style={styles.slideStack}>
+      <SlideEyebrow>About CySense</SlideEyebrow>
+      <View>
+        <Text style={styles.headline}>Find</Text>
+        <Text style={[styles.headline, styles.headlineAccent]}>your spot.</Text>
+      </View>
+      <Text style={styles.body}>
+        A quieter place to study before you walk into the wrong one. CySense
+        shows which campus spaces are calm or loud right now, based on what
+        other ISU students are seeing.
+      </Text>
+      <Text style={styles.bodySmall}>
+        Useful if you&apos;re sensitive to noise or crowds. Useful if you&apos;re just
+        sick of finding the library packed.
+      </Text>
+    </View>
+  );
+}
+
+function HowItWorksSlide() {
+  return (
+    <View style={styles.slideStack}>
+      <SlideEyebrow>How it works</SlideEyebrow>
+      <View>
+        <Text style={styles.headline}>Where the data</Text>
+        <Text style={[styles.headline, styles.headlineAccent]}>comes from.</Text>
+      </View>
+      <View style={styles.numberedList}>
+        <NumberedItem
+          n="01"
+          title="Other students"
+          body="Most of what you see is people sharing what a space feels like as they pass through it."
+        />
+        <NumberedItem
+          n="02"
+          title="Your zone, if you&apos;re ok with it"
+          body="If you turn on location, your phone tells the app which campus zone you&apos;re in. Off by default."
+        />
+        <NumberedItem
+          n="03"
+          title="A noise number"
+          body="When you submit a report, your phone can read the decibel level. The number gets sent. The recording stays."
+        />
+      </View>
+    </View>
+  );
+}
+
+function PrivacySlide() {
+  return (
+    <View style={styles.slideStack}>
+      <SlideEyebrow>Privacy</SlideEyebrow>
+      <View>
+        <Text style={styles.headline}>Off</Text>
+        <Text style={[styles.headline, styles.headlineAccent]}>by default.</Text>
+      </View>
+      <View style={styles.bulletList}>
+        <Bullet>No accounts. No profile. We don&apos;t know who you are.</Bullet>
+        <Bullet>Location and microphone stay off until you turn them on.</Bullet>
+        <Bullet>If you do turn on location, we know your zone, not your path.</Bullet>
+        <Bullet>Audio never leaves the phone. Just the noise number.</Bullet>
+      </View>
+    </View>
+  );
+}
+
+function FutureSlide() {
+  return (
+    <View style={styles.slideStack}>
+      <SlideEyebrow>What&apos;s next</SlideEyebrow>
+      <View>
+        <Text style={styles.headline}>Coming</Text>
+        <Text style={[styles.headline, styles.headlineAccent]}>soon.</Text>
+      </View>
+      <View style={styles.bulletList}>
+        <Bullet>Routing between buildings that picks the quieter path.</Bullet>
+        <Bullet>QR codes outside buildings so you can check before going in.</Bullet>
+        <Bullet>Save your favorite spots, get a ping when one opens up.</Bullet>
+        <Bullet>A place to leave a short note about a space for whoever shows up next.</Bullet>
+      </View>
+      <Text style={styles.footer}>Made for Swan Hacks at Iowa State.</Text>
+    </View>
+  );
+}
+
+function NumberedItem({ n, title, body }: { n: string; title: string; body: string }) {
+  return (
+    <View style={styles.numberedRow}>
+      <Text style={styles.numberedDigit}>{n}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.numberedTitle}>{title}</Text>
+        <Text style={styles.numberedBody}>{body}</Text>
+      </View>
     </View>
   );
 }
@@ -101,42 +303,159 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
     <View style={styles.bulletRow}>
-      <Text style={styles.bulletDot}>•</Text>
-      <Text style={[styles.body, { flex: 1 }]}>{children}</Text>
+      <View style={styles.bulletDot} />
+      <Text style={styles.bulletText}>{children}</Text>
     </View>
   );
 }
 
+// ----------------------------------------------------------------
+// Styles
+// ----------------------------------------------------------------
+
 const styles = StyleSheet.create({
-  header: { gap: spacing.xs, paddingBottom: spacing.sm },
-  headerBlob: {
-    position: "absolute",
-    top: -20,
-    right: -10,
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: colors.goldSoft,
+  canvas: {
+    flex: 1,
+    backgroundColor: colors.background,
   },
-  eyebrow: {
+
+  persistentHeader: {
+    position: "absolute",
+    left: 28,
+    right: 28,
+    top: 0,
+    zIndex: 10,
+  },
+  bigAbout: {
+    fontSize: 52,
+    fontWeight: "800",
+    color: colors.cardinal,
+    letterSpacing: -1.5,
+    lineHeight: 56,
+  },
+  aboutRule: {
+    width: 80,
+    height: 5,
+    backgroundColor: colors.gold,
+    borderRadius: 2.5,
+    marginTop: 10,
+  },
+
+  pageDots: {
+    position: "absolute",
+    right: 14,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    zIndex: 5,
+  },
+  pageDot: {
+    width: 6,
+    borderRadius: 3,
+  },
+
+  slideStack: { gap: spacing.lg },
+
+  // Editorial gold rule beneath the eyebrow caps
+  sectionEyebrow: {
     ...typography.caption,
     color: colors.cardinal,
     textTransform: "uppercase",
-    letterSpacing: 1.4,
+    letterSpacing: 2,
+    fontWeight: "700",
   },
-  title: { ...typography.display, color: colors.text },
-  body: { ...typography.body, color: colors.textSubtle },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
+  eyebrowRule: {
+    width: 44,
+    height: 4,
+    backgroundColor: colors.gold,
+    borderRadius: 2,
+  },
+
+  headline: {
+    fontSize: 42,
+    fontWeight: "700",
+    lineHeight: 48,
+    color: colors.text,
+    letterSpacing: -1,
+  },
+  headlineAccent: {
+    color: colors.cardinal,
+    fontStyle: "italic",
+  },
+  body: {
+    fontSize: 17,
+    fontWeight: "400",
+    color: colors.text,
+    lineHeight: 24,
+  },
+  bodySmall: {
+    fontSize: 14,
+    fontWeight: "400",
+    color: colors.text,
+    lineHeight: 20,
+    marginTop: spacing.sm,
+  },
+
+  numberedList: { gap: spacing.lg, marginTop: spacing.md },
+  numberedRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
     gap: spacing.md,
   },
-  cardTitle: { ...typography.heading, color: colors.text },
-  bulletRow: { flexDirection: "row", gap: spacing.sm },
-  bulletDot: { ...typography.bodyStrong, color: colors.cardinal, lineHeight: 22 },
-  footer: { paddingTop: spacing.md, alignItems: "center" },
-  footerText: { ...typography.small, color: colors.textMuted },
+  // Numbered digits in gold, not cardinal: gives the page a clear
+  // editorial pop and balances all the cardinal headlines/eyebrows.
+  numberedDigit: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: colors.gold,
+    letterSpacing: -0.5,
+    fontVariant: ["tabular-nums"],
+    width: 56,
+    lineHeight: 36,
+  },
+  numberedTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text,
+    letterSpacing: -0.2,
+  },
+  numberedBody: {
+    fontSize: 14,
+    fontWeight: "400",
+    color: colors.text,
+    lineHeight: 20,
+    marginTop: 2,
+  },
+
+  bulletList: { gap: spacing.md, marginTop: spacing.md },
+  bulletRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+  },
+  // Gold square bullets for a touch of yellow in the privacy/future lists
+  bulletDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+    backgroundColor: colors.gold,
+    marginTop: 7,
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "400",
+    color: colors.text,
+    lineHeight: 22,
+  },
+
+  footer: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: colors.text,
+    fontStyle: "italic",
+    marginTop: spacing.xl,
+  },
 });

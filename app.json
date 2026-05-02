@@ -6,18 +6,22 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/logos/cysense_app_icon.png",
     "splash": {
+      "image": "./assets/logos/cysense_app_icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F6F4EE"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "edu.iastate.cysense",
-      "associatedDomains": ["applinks:cysense.app"]
+      "associatedDomains": ["applinks:cysense.app"],
+      "icon": "./assets/logos/cysense_app_icon.png"
     },
     "web": {
       "bundler": "metro",
-      "output": "static"
+      "output": "static",
+      "favicon": "./assets/logos/cysense_app_icon.png"
     },
     "plugins": ["expo-router"],
     "experiments": {
