@@ -1,8 +1,9 @@
 # CySense
 
-A sensory-aware campus companion for Iowa State University. Helps students find
-calmer, less crowded, more usable spaces using crowdsourced live and historical
-information about noise, crowd density, seating, and lighting.
+A sensory-aware campus companion for Iowa State University. It helps students
+find calmer, less crowded, more usable spaces using crowdsourced live and
+historical information about noise, crowd density, seating, lighting, and now
+live study-room openings where LibCal data is available.
 
 Built for Swan Hacks. Privacy-first. No tracking.
 
@@ -10,18 +11,19 @@ Built for Swan Hacks. Privacy-first. No tracking.
 
 ## What's in this repo
 
-```
+```text
 app/                Expo Router screens (Home, Locations, Detail, Preferences, About)
-components/         Reusable UI (LocationCard, MetricBadge, SensoryStatusPill, TrendBars, ReportForm, …)
-lib/                Supabase client + data-source layer with auto-fallback to mock
+components/         Reusable UI (cards, badges, report form, room availability)
+lib/                Supabase client + data-source layer + LibCal client wrapper
 utils/              Sensory scoring, recommendations, formatting
-constants/          Theme + ISU mock data
+constants/          Theme + ISU mock data + LibCal config
 types/              Shared TypeScript types
 supabase/           schema.sql and seed.sql to paste into Supabase
+supabase/functions/ Edge Functions, including the LibCal room-availability bridge
 ```
 
-The data layer (`lib/dataSource.ts`) automatically falls back to mock data when
-Supabase env vars are blank, so the app is fully demo-able with **zero setup**.
+The data layer automatically falls back to mock data when Supabase is not
+configured, so the app is still demoable with zero setup.
 
 ---
 
@@ -32,10 +34,10 @@ cd Swan-Hacks
 npm install
 ```
 
-If you don't have the Expo / EAS CLIs yet:
+If you do not have the Supabase CLI yet:
 
 ```bash
-npm install -g eas-cli
+npm install -g supabase
 ```
 
 ---
@@ -43,136 +45,81 @@ npm install -g eas-cli
 ## 2. Run locally
 
 ```bash
-# Phone (Expo Go) — scan the QR code with the Expo Go app
 npx expo start
-
-# iOS simulator
 npx expo start --ios
-
-# Web (great as a demo backup)
 npx expo start --web
 ```
 
-Out of the box you'll see mock ISU data. The Home screen shows a "Demo data —
-Supabase not configured" chip so you know which mode you're in.
+Out of the box you will see mock ISU data. The Student Innovation Center detail
+page also shows mock room openings until the LibCal bridge is deployed.
 
 ---
 
-## 3. Set up Supabase (when you're ready)
+## 3. Set up Supabase
 
 1. Create a project at <https://supabase.com>.
-2. In the Supabase SQL editor, paste and run `supabase/schema.sql`.
-3. Paste and run `supabase/seed.sql` (creates 12 ISU locations + sample hourly trends).
-4. In Project Settings → API, copy the Project URL and `anon` key.
+2. In the Supabase SQL editor, paste and run [supabase/schema.sql](supabase/schema.sql).
+3. Paste and run [supabase/seed.sql](supabase/seed.sql).
+4. In Project Settings -> API, copy the Project URL and `anon` key.
 5. Create a `.env` file in the project root:
 
-   ```
-   EXPO_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-   ```
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+```
 
-6. Restart `npx expo start`. The "Demo data" chip will disappear and the app
-   will read/write through Supabase.
-
-The schema enables Row Level Security with public read for `locations`,
-`reports`, and `location_hourly_trends`, and an `anon`-friendly `INSERT` policy
-on `reports` (only valid 1–5 levels accepted).
-
----
-
-## 4. Deploy to TestFlight (EAS)
-
-You said you have an Apple Developer account — here's the path. From the project
-root:
+6. Deploy the LibCal bridge function:
 
 ```bash
-# Sign in & link to your Expo account
-eas login
-
-# One-time: create the EAS project on Expo's side
-eas init
-
-# Build a production iOS binary signed for the App Store
-eas build --platform ios --profile production
+supabase functions deploy libcal-availability
 ```
 
-When prompted:
+7. Restart Expo.
 
-- **Apple Account** → log in with your developer credentials.
-- **Bundle identifier** → `edu.iastate.cysense` (from `app.json`; change if you prefer).
-- **Push notifications** → not needed for the MVP, skip if asked.
-
-Once the build finishes, submit it:
-
-```bash
-eas submit --platform ios --latest
-```
-
-Open it on TestFlight from your iPhone. EAS handles the rest (provisioning,
-signing, ASC upload).
-
-> **Tip:** If you want a faster physical-device dev loop, build the
-> `development` profile once with `eas build --platform ios --profile development`
-> and run `npx expo start --dev-client`. You won't need TestFlight for daily
-> dev work — only for the demo.
+The schema adds optional LibCal metadata on `locations`, and the edge function
+fetches the public Iowa State LibCal page, replays the hidden availability-grid
+POST, and returns normalized room slots to the app.
 
 ---
 
-## 5. QR code deep links
+## 4. LibCal integration
 
-Each location's detail page lives at `/location/[slug]` — for example:
+CySense does not attempt to complete room bookings inside the app. It reads
+public availability from LibCal and links the user out to the official booking
+page to finish the reservation.
 
-```
-https://cysense.app/location/parks-library
-https://cysense.app/location/student-innovation-center
-https://cysense.app/location/memorial-union
-```
+Current supported location:
 
-For the hackathon, generate QR codes with any tool you like, e.g.:
+- Student Innovation Center: `https://sictr-iastate.libcal.com/spaces?lid=15606&gid=38061&c=0`
 
-```bash
-# macOS one-liner using qrencode (brew install qrencode)
-qrencode -o parks-library.png "https://cysense.app/location/parks-library"
-```
-
-…or use <https://qr-code-generator.com>.
-
-Two ways those URLs can open the app:
-
-1. **Web (instant):** the URL opens the Expo Web build in the browser.
-2. **iOS (Universal Links):** add the matching `apple-app-site-association`
-   file at `https://cysense.app/.well-known/apple-app-site-association`
-   pointing at your Team ID + bundle identifier. The route configuration
-   (`app.json` → `ios.associatedDomains`) is already in place.
-
-For the demo it's totally fine to use the web URL — that still tells the QR-on-the-wall
-story end-to-end.
+The reverse-engineered bridge lives in
+[supabase/functions/libcal-availability/index.ts](supabase/functions/libcal-availability/index.ts).
+It is intentionally isolated on the backend so the Expo client does not depend
+directly on undocumented third-party endpoints.
 
 ---
 
-## 6. Demo script (the story to tell)
+## 5. Demo flow
 
-1. Open the app. Home shows "Best quiet spots now" — Parks Library is **Busy**, Student Innovation Center is **Quiet**.
-2. Tap Parks Library → show the live status, popular-times bars, recent reports. "Too loud, let's check elsewhere."
-3. Back → tap Student Innovation Center → **Quiet**, plenty of seating.
-4. Walk to the printed QR code on a poster → scan → it opens directly to that location's page (web or app).
-5. Tap **Submit a quick report** → slide noise/crowd/seating/lighting → submit → success state. The page updates immediately.
-6. Open Preferences → flip "Prefer quieter spaces" → return to Home → recommendations re-rank.
-7. Open About → walk through the privacy principles and future vision (decibel readers, opt-in density, route planning).
+1. Open the app. Home shows recommended quiet spots.
+2. Compare Parks Library with Student Innovation Center.
+3. Open Student Innovation Center and show the new **Study rooms right now** card.
+4. Tap **Reserve in LibCal** to hand off to the official booking flow.
+5. Submit an anonymous sensory report to show the original CySense loop still works.
 
 ---
 
-## 7. What we deliberately did NOT build
+## 6. What we deliberately did not build
 
-- Production auth.
-- Real background location tracking.
-- Audio recording.
-- Maps with custom rendering.
-- ML-based predictions.
-- A full community discussion board (mentioned in About as future).
+- Production auth
+- Real background location tracking
+- Audio recording
+- Complex maps
+- ML-based predictions
+- In-app booking against LibCal's private endpoint
 
-Keeping these out of the MVP is the point — the architecture is set up so any of
-them can land later as feature work without restructuring.
+Keeping those out of the MVP is deliberate. The app stays demo-ready without
+overengineering.
 
 ---
 
@@ -214,10 +161,9 @@ All SVGs use `fill="currentColor"` so they tint via the `color` prop on `<Icon>`
 
 ## File reference
 
-- `lib/supabase.ts` — Supabase client (treats blank/`YOUR_…` env values as not configured).
-- `lib/dataSource.ts` — read/write surface used by every screen; auto-falls back to mock.
-- `utils/sensoryScore.ts` — `summarizeReports()` produces score (0–100) + status label.
-- `utils/recommendations.ts` — `rankLocations()` blends comfort score with user preferences.
-- `constants/campusLocations.ts` — mock data mirrors the Supabase schema 1:1.
-- `supabase/schema.sql` — tables + RLS policies.
-- `supabase/seed.sql` — 12 ISU locations + weekday hourly trend curves.
+- [lib/dataSource.ts](lib/dataSource.ts) - app-facing read/write surface
+- [lib/libcal.ts](lib/libcal.ts) - client wrapper for live room availability
+- [constants/libcal.ts](constants/libcal.ts) - LibCal mappings and mock room data
+- [supabase/schema.sql](supabase/schema.sql) - tables and RLS policies
+- [supabase/seed.sql](supabase/seed.sql) - ISU seed data plus LibCal metadata
+- [supabase/functions/libcal-availability/index.ts](supabase/functions/libcal-availability/index.ts) - reverse-engineered LibCal bridge

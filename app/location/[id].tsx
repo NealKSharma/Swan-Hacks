@@ -4,6 +4,7 @@ import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Screen } from "@/components/Screen";
 import { Button } from "@/components/Button";
 import { MetricBadge } from "@/components/MetricBadge";
+import { RoomAvailabilityCard } from "@/components/RoomAvailabilityCard";
 import { SensoryStatusPill } from "@/components/SensoryStatusPill";
 import { TrendBars } from "@/components/TrendBars";
 import { ReportForm } from "@/components/ReportForm";
@@ -13,9 +14,16 @@ import {
   listRecentReports,
   listTrends,
 } from "@/lib/dataSource";
+import { getRoomAvailability, locationSupportsRoomAvailability } from "@/lib/libcal";
 import { summarizeReports } from "@/utils/sensoryScore";
 import { timeAgo } from "@/utils/formatting";
-import type { HourlyTrend, Location, Report, SensorySummary } from "@/types";
+import type {
+  HourlyTrend,
+  Location,
+  Report,
+  RoomAvailabilityResponse,
+  SensorySummary,
+} from "@/types";
 
 export default function LocationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,14 +31,19 @@ export default function LocationDetailScreen() {
   const [summary, setSummary] = useState<SensorySummary | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [trends, setTrends] = useState<HourlyTrend[]>([]);
+  const [roomAvailability, setRoomAvailability] =
+    useState<RoomAvailabilityResponse | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [roomsLoading, setRoomsLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
     const loc = await getLocationBySlugOrId(id);
     if (!loc) {
       setLocation(null);
+      setRoomAvailability(null);
+      setRoomsLoading(false);
       setLoading(false);
       return;
     }
@@ -38,11 +51,26 @@ export default function LocationDetailScreen() {
       listRecentReports(loc.id, 120, 25),
       listTrends(loc.id),
     ]);
+    const supportsRooms = locationSupportsRoomAvailability(loc.slug);
+    if (supportsRooms) {
+      setRoomsLoading(true);
+    } else {
+      setRoomAvailability(null);
+      setRoomsLoading(false);
+    }
     setLocation(loc);
     setReports(recent);
     setTrends(trendData);
     setSummary(summarizeReports(recent));
     setLoading(false);
+    if (supportsRooms) {
+      try {
+        const rooms = await getRoomAvailability(loc.slug);
+        setRoomAvailability(rooms);
+      } finally {
+        setRoomsLoading(false);
+      }
+    }
   }, [id]);
 
   useEffect(() => {
@@ -123,6 +151,11 @@ export default function LocationDetailScreen() {
           Based on aggregated reports. Fills in as more students contribute.
         </Text>
       </View>
+
+      <RoomAvailabilityCard
+        availability={roomAvailability}
+        loading={roomsLoading}
+      />
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Recent anonymous reports</Text>

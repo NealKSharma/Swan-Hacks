@@ -17,6 +17,10 @@ export interface Location {
   latitude: number | null;
   longitude: number | null;
   accessibility_notes: string | null;
+  booking_url?: string | null;
+  libcal_lid?: number | null;
+  libcal_gid?: number | null;
+  libcal_capacity?: number | null;
   created_at: string;
 }
 
@@ -44,6 +48,42 @@ export interface HourlyTrend {
   avg_seating: number | null;
   avg_lighting: number | null;
   sample_count: number;
+}
+
+export interface RoomAvailabilitySlot {
+  start: string;
+  end: string;
+  reservation_url: string | null;
+  libcal_eid?: string | null;
+  libcal_checksum?: string | null;
+  libcal_start?: string | null;
+  libcal_gid?: string | null;
+  libcal_lid?: string | null;
+}
+
+export interface RoomAvailabilityRoom {
+  room_id: string;
+  room_name: string;
+  availability_class: string | null;
+  slots: RoomAvailabilitySlot[];
+}
+
+export interface RoomAvailabilityGroup {
+  key: string;
+  label: string;
+  booking_page_url: string;
+  rooms: RoomAvailabilityRoom[];
+}
+
+export interface RoomAvailabilityResponse {
+  location_slug: string;
+  location_name: string;
+  date: string;
+  booking_page_url: string;
+  fetched_at: string;
+  source: "libcal-live" | "mock";
+  groups: RoomAvailabilityGroup[];
+  note?: string | null;
 }
 
 export type SensoryStatus = "Quiet" | "Moderate" | "Busy" | "Loud";

@@ -16,6 +16,8 @@ function clean(value: string | undefined): string {
 
 const url = clean(process.env.EXPO_PUBLIC_SUPABASE_URL).replace(/\/+$/, "");
 const anonKey = clean(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+export const supabasePublicUrl = url;
+export const supabasePublicAnonKey = anonKey;
 
 // Treat blank or "YOUR_..." placeholders as not configured.
 function looksConfigured(value: string): boolean {

@@ -14,6 +14,23 @@ export function timeAgo(iso: string | null | undefined): string {
   return `${d} day${d === 1 ? "" : "s"} ago`;
 }
 
+export function formatClockTime(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const value = new Date(iso);
+  if (Number.isNaN(value.getTime())) return "-";
+  return value.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+export function formatTimeRange(
+  startIso: string | null | undefined,
+  endIso: string | null | undefined
+): string {
+  return `${formatClockTime(startIso)} - ${formatClockTime(endIso)}`;
+}
+
 export function levelLabel(
   metric: "noise" | "crowd" | "seating" | "lighting",
   value: number | null

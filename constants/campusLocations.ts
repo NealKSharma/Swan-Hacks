@@ -20,6 +20,10 @@ export const MOCK_LOCATIONS: Location[] = [
     longitude: -93.6498,
     accessibility_notes:
       "Step-free entry on the south side. Elevators to all floors. Quiet floors on 3rd and 4th levels.",
+    booking_url: "https://iastate.libcal.com/spaces?lid=14797",
+    libcal_lid: 14797,
+    libcal_gid: 0,
+    libcal_capacity: 0,
     created_at: ISO_NOW(),
   },
   {
@@ -33,6 +37,11 @@ export const MOCK_LOCATIONS: Location[] = [
     longitude: -93.6521,
     accessibility_notes:
       "Step-free entry on east side. Elevators throughout. Wide hallways and quiet nooks on upper floors.",
+    booking_url:
+      "https://sictr-iastate.libcal.com/spaces?lid=15606",
+    libcal_lid: 15606,
+    libcal_gid: 38061,
+    libcal_capacity: 0,
     created_at: ISO_NOW(),
   },
   {

@@ -18,8 +18,18 @@ create table if not exists public.locations (
   latitude      double precision,
   longitude     double precision,
   accessibility_notes text,
+  booking_url   text,
+  libcal_lid    integer,
+  libcal_gid    integer,
+  libcal_capacity integer,
   created_at    timestamptz not null default now()
 );
+
+alter table public.locations
+  add column if not exists booking_url text,
+  add column if not exists libcal_lid integer,
+  add column if not exists libcal_gid integer,
+  add column if not exists libcal_capacity integer;
 
 create table if not exists public.reports (
   id                   uuid primary key default gen_random_uuid(),

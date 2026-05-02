@@ -67,6 +67,14 @@ values
    'Paved paths throughout. Benches at intervals. No covered shelter — weather-dependent.')
 on conflict (slug) do nothing;
 
+update public.locations
+set
+  booking_url = 'https://sictr-iastate.libcal.com/spaces?lid=15606',
+  libcal_lid = 15606,
+  libcal_gid = 38061,
+  libcal_capacity = 0
+where slug = 'student-innovation-center';
+
 -- Hourly trends --------------------------------------------------
 -- Seeds a typical weekday curve. Demonstrates the "popular times" UI.
 -- We insert for day_of_week = 1..5 (Mon-Fri) only; weekends left empty for the MVP.

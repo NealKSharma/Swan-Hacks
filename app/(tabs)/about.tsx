@@ -39,6 +39,10 @@ export default function AboutScreen() {
         <Bullet>
           Your preferences tilt recommendations toward spaces that fit you.
         </Bullet>
+        <Bullet>
+          At supported buildings, CySense can also show live study-room openings
+          and send you to the official LibCal reservation page to complete the booking.
+        </Bullet>
       </Section>
 
       <Section title="Privacy principles">
