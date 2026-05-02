@@ -16,10 +16,7 @@ export default function RootLayout() {
           headerShadowVisible: false,
         }}
       >
-        <Stack.Screen name="index" options={{ title: "CySense" }} />
-        <Stack.Screen name="locations" options={{ title: "Browse spaces" }} />
-        <Stack.Screen name="preferences" options={{ title: "Your preferences" }} />
-        <Stack.Screen name="about" options={{ title: "About CySense" }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="location/[id]"
           options={{ title: "", headerBackTitle: "Back" }}

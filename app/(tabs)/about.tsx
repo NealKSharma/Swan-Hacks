@@ -1,11 +1,21 @@
+import { useCallback } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "expo-router";
+import { setStatusBarStyle } from "expo-status-bar";
 import { Screen } from "@/components/Screen";
 import { colors, radii, spacing, typography } from "@/constants/theme";
 
 export default function AboutScreen() {
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle("dark");
+    }, [])
+  );
+
   return (
-    <Screen>
-      <View style={styles.hero}>
+    <Screen contentContainerStyle={{ paddingTop: spacing.xl }}>
+      <View style={styles.header}>
+        <View style={styles.headerBlob} />
         <Text style={styles.eyebrow}>About</Text>
         <Text style={styles.title}>CySense</Text>
         <Text style={styles.body}>
@@ -27,20 +37,18 @@ export default function AboutScreen() {
           status label — Quiet, Moderate, Busy, or Overstimulating.
         </Bullet>
         <Bullet>
-          Your preferences (set in Preferences) tilt recommendations toward
-          spaces that fit you.
+          Your preferences tilt recommendations toward spaces that fit you.
         </Bullet>
       </Section>
 
       <Section title="Privacy principles">
-        <Bullet>No accounts required for the MVP. No tracking of individual students.</Bullet>
+        <Bullet>No accounts required. No tracking of individual students.</Bullet>
         <Bullet>
           Reports are anonymous and aggregated. We do not store personal location
           histories.
         </Bullet>
         <Bullet>
-          We use predefined campus zones, not continuous GPS trails. Indoor
-          positioning is deliberately not used.
+          We use predefined campus zones, not continuous GPS trails.
         </Bullet>
         <Bullet>No raw audio is recorded or stored — ever.</Bullet>
         <Bullet>
@@ -50,37 +58,20 @@ export default function AboutScreen() {
       </Section>
 
       <Section title="Future vision">
-        <Bullet>
-          Aggregated, opt-in location density so live crowd info doesn&apos;t depend
-          on manual reporting alone.
-        </Bullet>
-        <Bullet>
-          Campus-installed decibel readers in select hotspots, providing live noise
-          data without recording sound.
-        </Bullet>
-        <Bullet>
-          More accurate historical predictions as report volume grows.
-        </Bullet>
-        <Bullet>
-          QR codes posted at building entrances — scan to view current conditions
-          or submit a quick report.
-        </Bullet>
-        <Bullet>
-          Optional accounts for personalized alerts (e.g., &ldquo;Parks Library is quiet
-          right now&rdquo;).
-        </Bullet>
+        <Bullet>Aggregated, opt-in location density.</Bullet>
+        <Bullet>Campus-installed decibel readers in select hotspots.</Bullet>
+        <Bullet>More accurate historical predictions as data grows.</Bullet>
+        <Bullet>QR codes at building entrances — scan to view conditions.</Bullet>
+        <Bullet>Optional accounts for personalized alerts.</Bullet>
         <Bullet>Sensory-friendly route planning between buildings.</Bullet>
-        <Bullet>
-          A community board for location-specific anonymous notes and tips.
-        </Bullet>
+        <Bullet>A community board for location-specific anonymous notes.</Bullet>
       </Section>
 
       <Section title="On-device sound classification (future)">
         <Text style={styles.body}>
-          We&apos;re exploring a short, on-device sound sample (Shazam-style) to help
-          classify environment noise — but only if it can be done locally with no
-          raw audio leaving the phone. Until that&apos;s feasible and clearly
-          privacy-safe, we stick to manual reporting.
+          We&apos;re exploring a short, on-device sound sample to classify environment
+          noise — but only if it can be done locally with no raw audio leaving the
+          phone. Until that&apos;s feasible and clearly privacy-safe, manual reports stay.
         </Text>
       </Section>
 
@@ -110,19 +101,21 @@ function Bullet({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.sm,
+  header: { gap: spacing.xs, paddingBottom: spacing.sm },
+  headerBlob: {
+    position: "absolute",
+    top: -20,
+    right: -10,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: colors.goldSoft,
   },
   eyebrow: {
     ...typography.caption,
     color: colors.cardinal,
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 1.4,
   },
   title: { ...typography.display, color: colors.text },
   body: { ...typography.body, color: colors.textSubtle },

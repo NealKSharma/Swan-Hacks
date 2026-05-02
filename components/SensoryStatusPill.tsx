@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View, ViewStyle } from "react-native";
 import { colors, radii, spacing, typography } from "@/constants/theme";
-import { statusIcon } from "@/utils/formatting";
+import { Icon } from "@/components/Icon";
+import { statusIconName } from "@/utils/formatting";
 import type { SensoryStatus } from "@/types";
 
 interface Props {
@@ -18,15 +19,15 @@ export function SensoryStatusPill({ status, size = "md", style }: Props) {
       ? { paddingVertical: 10, paddingHorizontal: 16 }
       : { paddingVertical: 6, paddingHorizontal: 12 };
   const fontSize = size === "sm" ? 12 : size === "lg" ? 16 : 14;
+  const iconSize = size === "sm" ? 12 : size === "lg" ? 18 : 14;
   return (
     <View
       accessibilityLabel={`Sensory status: ${status}`}
       accessibilityRole="text"
       style={[styles.pill, { backgroundColor: bg }, padding, style]}
     >
-      <Text style={[styles.label, { fontSize }]}>
-        {statusIcon(status)}  {status}
-      </Text>
+      <Icon name={statusIconName(status)} size={iconSize} color="#FFFFFF" />
+      <Text style={[styles.label, { fontSize }]}>{status}</Text>
     </View>
   );
 }
@@ -48,6 +49,9 @@ const styles = StyleSheet.create({
   pill: {
     borderRadius: radii.pill,
     alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   label: {
     ...typography.bodyStrong,

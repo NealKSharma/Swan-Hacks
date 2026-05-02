@@ -1,3 +1,5 @@
+import type { IconName } from "@/components/Icon";
+
 export function timeAgo(iso: string | null | undefined): string {
   if (!iso) return "No reports yet";
   const then = new Date(iso).getTime();
@@ -30,32 +32,32 @@ export function levelLabel(
   }
 }
 
-export function metricIcon(
+export function metricIconName(
   metric: "noise" | "crowd" | "seating" | "lighting"
-): string {
+): IconName {
   switch (metric) {
     case "noise":
-      return "🔊";
+      return "metric-noise";
     case "crowd":
-      return "👥";
+      return "metric-crowd";
     case "seating":
-      return "🪑";
+      return "metric-seating";
     case "lighting":
-      return "💡";
+      return "metric-lighting";
   }
 }
 
-export function statusIcon(
+export function statusIconName(
   status: "Quiet" | "Moderate" | "Busy" | "Overstimulating"
-): string {
+): IconName {
   switch (status) {
     case "Quiet":
-      return "🌿";
+      return "status-quiet";
     case "Moderate":
-      return "🌤";
+      return "status-moderate";
     case "Busy":
-      return "⚡";
+      return "status-busy";
     case "Overstimulating":
-      return "⚠️";
+      return "status-loud";
   }
 }

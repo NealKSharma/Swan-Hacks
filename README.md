@@ -176,6 +176,42 @@ them can land later as feature work without restructuring.
 
 ---
 
+## Custom icons
+
+The app uses inline Lucide-style SVG icons via `react-native-svg`, mapped through
+`components/Icon.tsx`. To swap any icon for a custom design:
+
+1. Drop your SVG file at `assets/icons/<name>.svg` (see "icon names" below).
+   Stick to a 24×24 viewBox with stroke-based artwork to match the rest.
+2. In `components/Icon.tsx`, find the matching `Icon<Name>` const and replace
+   its body with:
+
+   ```tsx
+   import Custom from "@/assets/icons/<name>.svg";
+   const IconQuiet: ComponentType<InternalProps> = (p) => (
+     <Custom width={p.size} height={p.size} stroke={p.color} strokeWidth={p.strokeWidth} />
+   );
+   ```
+
+The `react-native-svg-transformer` config in `metro.config.js` makes any
+`.svg` import work as a React component automatically.
+
+### Icon names you'll need (one SVG per name)
+
+| Filename                            | Used for                           | Suggested Lucide icon |
+| ----------------------------------- | ---------------------------------- | --------------------- |
+| `status-quiet.svg`                  | Sensory status pill — Quiet        | `leaf`                |
+| `status-moderate.svg`               | Sensory status pill — Moderate     | `cloud-sun`           |
+| `status-busy.svg`                   | Sensory status pill — Busy         | `activity`            |
+| `status-loud.svg`                   | Sensory status pill — Overstim.    | `triangle-alert`      |
+| `metric-noise.svg`                  | Metric badge — Noise               | `volume-2`            |
+| `metric-crowd.svg`                  | Metric badge — Crowd               | `users`               |
+| `metric-seating.svg`                | Metric badge — Seating             | `armchair`            |
+| `metric-lighting.svg`               | Metric badge — Lighting            | `lamp`                |
+| `chevron-right.svg`                 | "See all" / forward CTAs           | `chevron-right`       |
+
+Grab them from <https://lucide.dev> (MIT-licensed, click an icon → "Copy SVG").
+
 ## File reference
 
 - `lib/supabase.ts` — Supabase client (treats blank/`YOUR_…` env values as not configured).

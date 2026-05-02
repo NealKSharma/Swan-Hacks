@@ -57,7 +57,7 @@ export default function LocationDetailScreen() {
 
   if (loading) {
     return (
-      <Screen>
+      <Screen reserveTabBar={false}>
         <Text style={styles.muted}>Loading…</Text>
       </Screen>
     );
@@ -65,7 +65,7 @@ export default function LocationDetailScreen() {
 
   if (!location || !summary) {
     return (
-      <Screen>
+      <Screen reserveTabBar={false}>
         <Stack.Screen options={{ title: "Not found" }} />
         <Text style={styles.muted}>
           We couldn&apos;t find that location. The QR code may be out of date.
@@ -79,7 +79,7 @@ export default function LocationDetailScreen() {
   const hour = now.getHours();
 
   return (
-    <Screen>
+    <Screen reserveTabBar={false}>
       <Stack.Screen options={{ title: location.name }} />
 
       <View style={styles.header}>

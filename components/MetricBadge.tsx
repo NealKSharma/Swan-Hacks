@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 import { colors, radii, spacing, typography } from "@/constants/theme";
-import { levelLabel, metricIcon } from "@/utils/formatting";
+import { Icon } from "@/components/Icon";
+import { levelLabel, metricIconName } from "@/utils/formatting";
 
 type Metric = "noise" | "crowd" | "seating" | "lighting";
 
@@ -24,7 +25,9 @@ export function MetricBadge({ metric, value, compact = false }: Props) {
       style={[styles.badge, compact && styles.compact]}
       accessibilityLabel={`${TITLES[metric]}: ${label}`}
     >
-      <Text style={styles.icon}>{metricIcon(metric)}</Text>
+      <View style={styles.iconWrap}>
+        <Icon name={metricIconName(metric)} size={18} color={colors.textSubtle} />
+      </View>
       <View style={{ flexShrink: 1 }}>
         <Text style={styles.title}>{TITLES[metric]}</Text>
         <Text style={styles.value}>{label}</Text>
@@ -47,7 +50,14 @@ const styles = StyleSheet.create({
     minWidth: 140,
   },
   compact: { paddingVertical: 6, paddingHorizontal: 10, minWidth: 100 },
-  icon: { fontSize: 20 },
+  iconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   title: { ...typography.caption, color: colors.textSubtle, textTransform: "uppercase" },
   value: { ...typography.bodyStrong, color: colors.text },
 });

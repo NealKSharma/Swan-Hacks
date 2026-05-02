@@ -56,7 +56,7 @@ export function ReportForm({ locationId, onSubmitted }: Props) {
   if (success) {
     return (
       <View style={styles.successCard}>
-        <Text style={styles.successTitle}>Thanks for the report 🌿</Text>
+        <Text style={styles.successTitle}>Thanks for the report</Text>
         <Text style={styles.successBody}>
           Your anonymous report helps other students find calmer spaces.
         </Text>

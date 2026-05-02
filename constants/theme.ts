@@ -1,36 +1,48 @@
-// Calm, sensory-friendly palette with restrained ISU cardinal accents.
-// Avoids saturated reds/yellows in large surfaces; uses cardinal only on
-// CTAs/highlights. Backgrounds are warm off-whites with cool greys for text.
+// CySense theme.
+//
+// Calm, sensory-friendly base with cardinal red as the primary action color
+// and gold as a secondary accent. The palette is intentionally restrained —
+// most of the app is white and warm-neutral, with cardinal showing up only on
+// CTAs, active states, and key emphasis.
 
 export const colors = {
   // Surfaces
-  background: "#F6F4EE",      // warm off-white (parchment)
+  background: "#FAF7F2",      // warm off-white
   surface: "#FFFFFF",
-  surfaceMuted: "#EDEAE2",
-  border: "#DEDAD0",
+  surfaceMuted: "#F2EEE7",
+  border: "#E8E2D6",
 
   // Text
-  text: "#1F2530",            // near-black, slightly cool
+  text: "#1A1F2A",
   textSubtle: "#5A6472",
   textMuted: "#8A93A0",
 
   // Sensory status (paired with icons + labels — never color-only)
-  quiet: "#3F8F6E",           // sage green
-  moderate: "#C8A04A",        // muted amber/gold
-  busy: "#B86E3C",            // burnt orange
-  overstimulating: "#9C2A39", // deep cardinal-leaning red
+  quiet: "#3F8F6E",
+  moderate: "#C8A04A",
+  busy: "#B86E3C",
+  overstimulating: "#9C2A39",
 
-  // ISU accents (used sparingly)
-  cardinal: "#C8102E",
-  cardinalSoft: "#F2DCE0",
-  gold: "#F1BE48",
+  // ISU accents
+  cardinal: "#C8102E",          // primary action
+  cardinalDeep: "#A50D26",      // pressed / strong text
+  cardinalSoft: "#FBE5E8",      // subtle backgrounds, highlights
+  gold: "#F1BE48",              // secondary accent
+  goldSoft: "#FBF0D0",          // subtle accent backgrounds
 
-  // Functional
-  accent: "#3E6B89",          // calm blue used for primary actions
-  accentSoft: "#DDE7EE",
+  // Functional aliases — these used to point at a calm blue.
+  // Now they map to cardinal so the whole app picks up the new primary.
+  accent: "#C8102E",
+  accentSoft: "#FBE5E8",
   success: "#3F8F6E",
   warning: "#C8A04A",
   danger: "#9C2A39",
+
+  // Tab bar
+  tabActive: "#C8102E",
+  tabInactive: "#9CA3AF",
+  tabBg: "#FFFFFF",
+  tabBorder: "#EFEAE0",
 };
 
 export const radii = {
@@ -51,21 +63,35 @@ export const spacing = {
 };
 
 export const typography = {
-  display: { fontSize: 28, fontWeight: "700" as const, letterSpacing: -0.4 },
+  display: { fontSize: 32, fontWeight: "700" as const, letterSpacing: -0.5 },
   title:   { fontSize: 22, fontWeight: "700" as const, letterSpacing: -0.2 },
   heading: { fontSize: 18, fontWeight: "600" as const },
   body:    { fontSize: 16, fontWeight: "400" as const, lineHeight: 22 },
   bodyStrong: { fontSize: 16, fontWeight: "600" as const, lineHeight: 22 },
   small:   { fontSize: 14, fontWeight: "400" as const, lineHeight: 19 },
-  caption: { fontSize: 12, fontWeight: "500" as const, letterSpacing: 0.2 },
+  caption: { fontSize: 12, fontWeight: "500" as const, letterSpacing: 0.4 },
 };
 
 export const shadows = {
   card: {
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     elevation: 2,
+  },
+  hero: {
+    shadowColor: "#9C2A39",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 6,
+  },
+  tabBar: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 8,
   },
 };

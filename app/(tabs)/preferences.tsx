@@ -1,4 +1,7 @@
+import { useCallback } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { useFocusEffect } from "expo-router";
+import { setStatusBarStyle } from "expo-status-bar";
 import { Screen } from "@/components/Screen";
 import { colors, radii, spacing, typography } from "@/constants/theme";
 import { usePreferences } from "@/lib/preferencesStore";
@@ -10,26 +13,35 @@ const LEVELS: Level[] = [1, 2, 3, 4, 5];
 export default function PreferencesScreen() {
   const { prefs, update, loaded } = usePreferences();
 
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle("dark");
+    }, [])
+  );
+
   if (!loaded) {
     return (
-      <Screen>
+      <Screen contentContainerStyle={{ paddingTop: spacing.xl }}>
         <Text style={styles.muted}>Loading…</Text>
       </Screen>
     );
   }
 
   return (
-    <Screen>
-      <Text style={styles.intro}>
-        Set your sensory preferences. CySense uses these to recommend better-fit
-        spaces. Preferences stay on your device.
-      </Text>
+    <Screen contentContainerStyle={{ paddingTop: spacing.xl }}>
+      <View style={styles.header}>
+        <View style={styles.headerBlob} />
+        <Text style={styles.eyebrow}>Personalize</Text>
+        <Text style={styles.title}>Preferences</Text>
+        <Text style={styles.intro}>
+          Set your sensory preferences. CySense uses these to recommend better-fit
+          spaces. Preferences stay on your device.
+        </Text>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Maximum noise you&apos;re OK with</Text>
-        <Text style={styles.helper}>
-          Currently: {levelLabel("noise", prefs.maxNoise)}
-        </Text>
+        <Text style={styles.helper}>Currently: {levelLabel("noise", prefs.maxNoise)}</Text>
         <Scale
           value={prefs.maxNoise}
           onChange={(v) => update({ maxNoise: v })}
@@ -40,9 +52,7 @@ export default function PreferencesScreen() {
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Maximum crowd you&apos;re OK with</Text>
-        <Text style={styles.helper}>
-          Currently: {levelLabel("crowd", prefs.maxCrowd)}
-        </Text>
+        <Text style={styles.helper}>Currently: {levelLabel("crowd", prefs.maxCrowd)}</Text>
         <Scale
           value={prefs.maxCrowd}
           onChange={(v) => update({ maxCrowd: v })}
@@ -73,14 +83,17 @@ export default function PreferencesScreen() {
   );
 }
 
-interface ScaleProps {
+function Scale({
+  value,
+  onChange,
+  leftCue,
+  rightCue,
+}: {
   value: Level;
   onChange: (v: Level) => void;
   leftCue: string;
   rightCue: string;
-}
-
-function Scale({ value, onChange, leftCue, rightCue }: ScaleProps) {
+}) {
   return (
     <View style={{ gap: spacing.sm }}>
       <View style={styles.scale}>
@@ -108,14 +121,17 @@ function Scale({ value, onChange, leftCue, rightCue }: ScaleProps) {
   );
 }
 
-interface ToggleRowProps {
+function ToggleRow({
+  title,
+  description,
+  value,
+  onChange,
+}: {
   title: string;
   description: string;
   value: boolean;
   onChange: (v: boolean) => void;
-}
-
-function ToggleRow({ title, description, value, onChange }: ToggleRowProps) {
+}) {
   return (
     <View style={styles.toggleRow}>
       <View style={{ flex: 1, paddingRight: spacing.md }}>
@@ -125,7 +141,7 @@ function ToggleRow({ title, description, value, onChange }: ToggleRowProps) {
       <Switch
         value={value}
         onValueChange={onChange}
-        trackColor={{ false: colors.border, true: colors.accent }}
+        trackColor={{ false: colors.border, true: colors.cardinal }}
         accessibilityLabel={title}
       />
     </View>
@@ -133,6 +149,23 @@ function ToggleRow({ title, description, value, onChange }: ToggleRowProps) {
 }
 
 const styles = StyleSheet.create({
+  header: { gap: 4, paddingBottom: spacing.sm },
+  headerBlob: {
+    position: "absolute",
+    top: -20,
+    right: -10,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: colors.cardinalSoft,
+  },
+  eyebrow: {
+    ...typography.caption,
+    color: colors.cardinal,
+    textTransform: "uppercase",
+    letterSpacing: 1.4,
+  },
+  title: { ...typography.display, color: colors.text },
   intro: { ...typography.body, color: colors.textSubtle },
   card: {
     backgroundColor: colors.surface,
@@ -164,7 +197,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  dotSelected: { backgroundColor: colors.accent, borderColor: colors.accent },
+  dotSelected: { backgroundColor: colors.cardinal, borderColor: colors.cardinal },
   dotLabel: { ...typography.bodyStrong, color: colors.text },
   dotLabelSelected: { color: "#FFFFFF" },
   cues: { flexDirection: "row", justifyContent: "space-between" },
