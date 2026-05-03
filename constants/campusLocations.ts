@@ -168,68 +168,62 @@ export const MOCK_LOCATIONS: Location[] = [
 // A handful of recent reports per location to make the demo feel alive.
 // Quieter places (library, lago) have low noise/crowd; busy places (MU, gym, dining) skew high.
 export const MOCK_REPORTS: Report[] = [
-  // Parks Library. currently busy/noisy (story: student decides to go elsewhere)
-  r("loc-parks", 4, 4, 2, 4, 8, "Finals week energy, hard to focus."),
-  r("loc-parks", 3, 4, 2, 4, 22),
-  r("loc-parks", 4, 5, 1, 4, 35),
+  // Parks Library — currently busy/noisy
+  r("loc-parks", 4, 4, 8),
+  r("loc-parks", 3, 4, 22),
+  r("loc-parks", 4, 5, 35),
 
-  // SIC. currently calm (story: student picks this instead)
-  r("loc-sic", 2, 2, 4, 3, 6, "2nd floor nooks are open."),
-  r("loc-sic", 1, 2, 5, 3, 19),
-  r("loc-sic", 2, 1, 4, 3, 41),
+  // SIC — currently calm
+  r("loc-sic", 2, 2, 6),
+  r("loc-sic", 1, 2, 19),
+  r("loc-sic", 2, 1, 41),
 
-  // Memorial Union. moderate
-  r("loc-mu", 3, 3, 3, 4, 12),
-  r("loc-mu", 4, 4, 2, 4, 30, "Lunch rush starting."),
+  // Memorial Union — moderate
+  r("loc-mu", 3, 3, 12),
+  r("loc-mu", 4, 4, 30),
 
   // Gerdin
-  r("loc-gerdin", 2, 3, 4, 3, 14),
-  r("loc-gerdin", 2, 2, 4, 3, 28),
+  r("loc-gerdin", 2, 3, 14),
+  r("loc-gerdin", 2, 2, 28),
 
   // Troxel
-  r("loc-troxel", 1, 1, 5, 2, 10, "Empty between lectures."),
+  r("loc-troxel", 1, 1, 10),
 
-  // Friley dining. very busy
-  r("loc-friley", 5, 5, 1, 4, 7, "Packed for dinner."),
-  r("loc-friley", 4, 5, 2, 4, 25),
+  // Friley dining — very busy
+  r("loc-friley", 5, 5, 7),
+  r("loc-friley", 4, 5, 25),
 
-  // State Gym. loud
-  r("loc-stategym", 5, 4, 3, 5, 9),
-  r("loc-stategym", 4, 5, 2, 5, 33),
+  // State Gym — loud
+  r("loc-stategym", 5, 4, 9),
+  r("loc-stategym", 4, 5, 33),
 
-  // Design. moderate, sound-carrying
-  r("loc-design", 3, 3, 3, 3, 16),
+  // Design — moderate, sound-carrying
+  r("loc-design", 3, 3, 16),
 
-  // Howe. calm
-  r("loc-howe", 2, 1, 5, 3, 11),
+  // Howe — calm
+  r("loc-howe", 2, 1, 11),
 
-  // Curtiss. moderate
-  r("loc-curtiss", 3, 3, 3, 3, 26),
+  // Curtiss — moderate
+  r("loc-curtiss", 3, 3, 26),
 
-  // Lago. quiet
-  r("loc-lago", 1, 2, 4, 2, 13, "Courtyard lounge open."),
+  // Lago — quiet
+  r("loc-lago", 1, 2, 13),
 
-  // Central campus. moderate, bright
-  r("loc-central", 2, 3, 4, 5, 17, "Sunny and warm out."),
+  // Central campus — moderate
+  r("loc-central", 2, 3, 17),
 ];
 
 function r(
   location_id: string,
   noise: number,
   crowd: number,
-  seating: number,
-  lighting: number,
-  agoMin: number,
-  comment: string | null = null
+  agoMin: number
 ): Report {
   return {
     id: `mock-report-${location_id}-${agoMin}`,
     location_id,
     noise_level: noise as Report["noise_level"],
     crowd_level: crowd as Report["crowd_level"],
-    seating_level: seating as Report["seating_level"],
-    lighting_level: lighting as Report["lighting_level"],
-    comment,
     anonymous_session_id: null,
     created_at: minutesAgo(agoMin),
   };

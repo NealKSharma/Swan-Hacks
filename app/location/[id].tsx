@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Stack, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Screen } from "@/components/Screen";
 import { Button } from "@/components/Button";
@@ -130,8 +130,6 @@ export default function LocationDetailScreen() {
       <View style={styles.metricsGrid}>
         <MetricBadge metric="noise" value={summary.noise} />
         <MetricBadge metric="crowd" value={summary.crowd} />
-        <MetricBadge metric="seating" value={summary.seating} />
-        <MetricBadge metric="lighting" value={summary.lighting} />
       </View>
 
       {location.accessibility_notes && (
@@ -168,33 +166,34 @@ export default function LocationDetailScreen() {
             <View key={r.id} style={styles.reportRow}>
               <Text style={styles.reportTime}>{timeAgo(r.created_at)}</Text>
               <Text style={styles.reportLine}>
-                Noise {r.noise_level}/5 • Crowd {r.crowd_level}/5 • Seating {r.seating_level}/5
+                Noise {r.noise_level}/5 • Crowd {r.crowd_level}/5
               </Text>
-              {r.comment && <Text style={styles.reportComment}>“{r.comment}”</Text>}
             </View>
           ))
         )}
       </View>
 
-      {showForm ? (
-        <View style={styles.card}>
-          <ReportForm
-            locationId={location.id}
-            onSubmitted={() => {
-              load();
-            }}
-          />
-          <Pressable onPress={() => setShowForm(false)} accessibilityRole="button">
-            <Text style={styles.cancelLink}>Close</Text>
-          </Pressable>
-        </View>
-      ) : (
-        <Button
-          label="Submit a quick report"
-          variant="cardinal"
-          onPress={() => setShowForm(true)}
+      <Button
+        label="Submit a quick report"
+        variant="cardinal"
+        onPress={() => setShowForm(true)}
+      />
+
+      <Modal
+        visible={showForm}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowForm(false)}
+      >
+        <ReportForm
+          locationId={location.id}
+          locationName={location.name}
+          onClose={() => setShowForm(false)}
+          onSubmitted={() => {
+            load();
+          }}
         />
-      )}
+      </Modal>
     </Screen>
   );
 }
@@ -248,7 +247,5 @@ const styles = StyleSheet.create({
   },
   reportTime: { ...typography.caption, color: colors.textMuted },
   reportLine: { ...typography.body, color: colors.text },
-  reportComment: { ...typography.small, color: colors.textSubtle, fontStyle: "italic" },
-  cancelLink: { ...typography.bodyStrong, color: colors.accent, textAlign: "center" },
   muted: { ...typography.body, color: colors.textMuted },
 });

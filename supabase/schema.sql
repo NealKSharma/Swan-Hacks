@@ -36,9 +36,6 @@ create table if not exists public.reports (
   location_id          uuid not null references public.locations(id) on delete cascade,
   noise_level          smallint not null check (noise_level between 1 and 5),
   crowd_level          smallint not null check (crowd_level between 1 and 5),
-  seating_level        smallint not null check (seating_level between 1 and 5),
-  lighting_level       smallint not null check (lighting_level between 1 and 5),
-  comment              text,
   anonymous_session_id text,                   -- opaque, client-generated; never tied to identity
   created_at           timestamptz not null default now()
 );
@@ -68,8 +65,6 @@ select
   count(r.id)     as report_count,
   avg(r.noise_level)::numeric(3,2)    as avg_noise,
   avg(r.crowd_level)::numeric(3,2)    as avg_crowd,
-  avg(r.seating_level)::numeric(3,2)  as avg_seating,
-  avg(r.lighting_level)::numeric(3,2) as avg_lighting,
   max(r.created_at) as last_reported_at
 from public.locations l
 left join public.reports r
@@ -105,8 +100,6 @@ drop policy if exists "anyone can submit a report" on public.reports;
 create policy "anyone can submit a report"
   on public.reports for insert
   with check (
-    noise_level    between 1 and 5
-    and crowd_level    between 1 and 5
-    and seating_level  between 1 and 5
-    and lighting_level between 1 and 5
+    noise_level between 1 and 5
+    and crowd_level between 1 and 5
   );

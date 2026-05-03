@@ -29,9 +29,6 @@ export interface Report {
   location_id: string;
   noise_level: Level;
   crowd_level: Level;
-  seating_level: Level;
-  lighting_level: Level;
-  comment: string | null;
   anonymous_session_id: string | null;
   created_at: string;
 }
@@ -50,21 +47,41 @@ export interface HourlyTrend {
   sample_count: number;
 }
 
+export type SensoryStatus = "Quiet" | "Moderate" | "Busy" | "Loud";
+
+export interface SensorySummary {
+  status: SensoryStatus;
+  score: number; // 0..100, higher = calmer / more sensory-friendly
+  noise: number | null;
+  crowd: number | null;
+  reportCount: number;
+  lastReportedAt: string | null;
+}
+
+export interface UserPreferences {
+  maxNoise: Level;
+  maxCrowd: Level;
+  preferQuiet: boolean;
+}
+
+export const DEFAULT_PREFERENCES: UserPreferences = {
+  maxNoise: 3,
+  maxCrowd: 3,
+  preferQuiet: true,
+};
+
+// LibCal study-room availability shapes (lives in types so the lib + UI
+// + edge function can all share the same contract).
 export interface RoomAvailabilitySlot {
   start: string;
   end: string;
-  reservation_url: string | null;
-  libcal_eid?: string | null;
-  libcal_checksum?: string | null;
-  libcal_start?: string | null;
-  libcal_gid?: string | null;
-  libcal_lid?: string | null;
+  reservation_url?: string | null;
 }
 
 export interface RoomAvailabilityRoom {
   room_id: string;
   room_name: string;
-  availability_class: string | null;
+  availability_class?: string | null;
   slots: RoomAvailabilitySlot[];
 }
 
@@ -76,41 +93,10 @@ export interface RoomAvailabilityGroup {
 }
 
 export interface RoomAvailabilityResponse {
-  location_slug: string;
-  location_name: string;
+  slug: string;
   date: string;
-  booking_page_url: string;
   fetched_at: string;
-  source: "libcal-live" | "mock";
-  groups: RoomAvailabilityGroup[];
+  booking_page_url: string;
   note?: string | null;
+  groups: RoomAvailabilityGroup[];
 }
-
-export type SensoryStatus = "Quiet" | "Moderate" | "Busy" | "Loud";
-
-export interface SensorySummary {
-  status: SensoryStatus;
-  score: number; // 0..100, higher = calmer / more sensory-friendly
-  noise: number | null;
-  crowd: number | null;
-  seating: number | null;
-  lighting: number | null;
-  reportCount: number;
-  lastReportedAt: string | null;
-}
-
-export interface UserPreferences {
-  maxNoise: Level;
-  maxCrowd: Level;
-  preferQuiet: boolean;
-  preferSeating: boolean;
-  preferLowLight: boolean;
-}
-
-export const DEFAULT_PREFERENCES: UserPreferences = {
-  maxNoise: 3,
-  maxCrowd: 3,
-  preferQuiet: true,
-  preferSeating: true,
-  preferLowLight: false,
-};

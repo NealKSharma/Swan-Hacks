@@ -67,18 +67,6 @@ export default function PreferencesScreen() {
         value={prefs.preferQuiet}
         onChange={(v) => update({ preferQuiet: v })}
       />
-      <ToggleRow
-        title="Prefer plenty of seating"
-        description="Boost places with open tables and lounges."
-        value={prefs.preferSeating}
-        onChange={(v) => update({ preferSeating: v })}
-      />
-      <ToggleRow
-        title="Prefer softer lighting"
-        description="Boost places with dimmer, more even lighting."
-        value={prefs.preferLowLight}
-        onChange={(v) => update({ preferLowLight: v })}
-      />
     </Screen>
   );
 }
