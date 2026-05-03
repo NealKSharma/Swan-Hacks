@@ -21,12 +21,14 @@ import Animated, {
 } from "react-native-reanimated";
 import { CrowdSenseMapView } from "@/components/CrowdSenseMapView";
 import { Icon } from "@/components/Icon";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { LocationCard } from "@/components/LocationCard";
 import { ScreenFade } from "@/components/ScreenFade";
 import { colors, radii, shadows, spacing, typography } from "@/constants/theme";
 import { listAllRecentReports, listLocations } from "@/lib/dataSource";
 import {
   findClosestHotspot,
+  findNearbyHotspot,
   getCrowdLevels,
   getCurrentCrowdSenseLocation,
   isCrowdSenseEnabled,
@@ -76,14 +78,16 @@ export default function SpacesScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [crowdLevels, setCrowdLevels] = useState<CrowdLevel[]>([]);
-  const [closestSpot, setClosestSpot] = useState<{ name: string } | null>(
-    null
-  );
+  const [closestSpot, setClosestSpot] = useState<{
+    name: string;
+    inside: boolean;
+  } | null>(null);
 
   // Pulls the user's current foreground position and computes the closest
   // hotspot — but only if location sharing is currently enabled. No-ops
   // silently otherwise (so we never trigger a permission dialog from this
-  // screen — that's the Preferences toggle's job).
+  // screen — that's the Preferences toggle's job). If the user is actually
+  // inside a hotspot's radius the label switches to "currently at".
   const refreshClosestSpot = useCallback(async () => {
     try {
       if (!(await isCrowdSenseEnabled())) {
@@ -91,8 +95,13 @@ export default function SpacesScreen() {
         return;
       }
       const coords = await getCurrentCrowdSenseLocation();
-      const match = await findClosestHotspot(coords);
-      setClosestSpot(match ? { name: match.hotspot.name } : null);
+      const inside = await findNearbyHotspot(coords);
+      if (inside) {
+        setClosestSpot({ name: inside.hotspot.name, inside: true });
+        return;
+      }
+      const closest = await findClosestHotspot(coords);
+      setClosestSpot(closest ? { name: closest.hotspot.name, inside: false } : null);
     } catch {
       setClosestSpot(null);
     }
@@ -284,7 +293,7 @@ export default function SpacesScreen() {
                   showsVerticalScrollIndicator={false}
                   ListEmptyComponent={
                     loading ? (
-                      <Text style={styles.muted}>Loading…</Text>
+                      <LoadingIndicator style={styles.listLoading} />
                     ) : (
                       <Text style={styles.muted}>No spaces yet.</Text>
                     )
@@ -309,7 +318,9 @@ export default function SpacesScreen() {
                 </View>
                 {closestSpot ? (
                   <Text style={styles.closestText}>
-                    Closest study space: {closestSpot.name}
+                    {closestSpot.inside
+                      ? `You are currently at: ${closestSpot.name}`
+                      : `Closest study space: ${closestSpot.name}`}
                   </Text>
                 ) : null}
               </View>
@@ -603,6 +614,9 @@ const styles = StyleSheet.create({
   listHead: {
     height: spacing.lg,
   },
+  listLoading: {
+    minHeight: 240,
+  },
   separator: {
     paddingVertical: spacing.lg,
     alignItems: "stretch",
@@ -643,7 +657,7 @@ const styles = StyleSheet.create({
     color: colors.cardinal,
     letterSpacing: 0.2,
     textAlign: "center",
-    marginTop: spacing.md,
+    marginTop: -spacing.xs,
   },
 
   // Sort modal

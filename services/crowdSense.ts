@@ -16,7 +16,12 @@ import type {
 
 const CROWD_SENSE_ENABLED_KEY = "cysense.crowdSense.enabled";
 const CROWD_SENSE_DEVICE_ID_KEY = "cysense.crowdSense.anonDeviceId";
-const CROWD_SENSE_NOTIFIED_ONCE_KEY = "cysense.crowdSense.notifiedOnce";
+// Per-hotspot timestamp of the last notification we fired for that zone.
+// Replaces the previous global "notified once forever" flag — the old key
+// kicked in after the first detection and silenced every subsequent zone.
+const CROWD_SENSE_LAST_NOTIFIED_PREFIX = "cysense.crowdSense.lastNotified.";
+// Cooldown window — same hotspot won't re-notify within this many ms.
+const CROWD_SENSE_NOTIFY_COOLDOWN_MS = 2 * 60 * 60 * 1000; // 2 hours
 const SNAPSHOT_BUCKET_MINUTES = 5;
 const CROWD_WINDOW_MINUTES = 15;
 const HOTSPOT_CACHE_MS = 60_000;
@@ -142,25 +147,39 @@ async function ensureNotificationPermission(): Promise<boolean> {
   );
 }
 
-async function hasSentCrowdSenseNotification(): Promise<boolean> {
-  return (await AsyncStorage.getItem(CROWD_SENSE_NOTIFIED_ONCE_KEY)) === "true";
+async function hasNotifiedHotspotRecently(hotspotId: string): Promise<boolean> {
+  const raw = await AsyncStorage.getItem(
+    CROWD_SENSE_LAST_NOTIFIED_PREFIX + hotspotId
+  );
+  if (!raw) return false;
+  const last = Number(raw);
+  if (!Number.isFinite(last)) return false;
+  return Date.now() - last < CROWD_SENSE_NOTIFY_COOLDOWN_MS;
 }
 
-async function markCrowdSenseNotificationSent(): Promise<void> {
-  await AsyncStorage.setItem(CROWD_SENSE_NOTIFIED_ONCE_KEY, "true");
+async function markHotspotNotified(hotspotId: string): Promise<void> {
+  await AsyncStorage.setItem(
+    CROWD_SENSE_LAST_NOTIFIED_PREFIX + hotspotId,
+    String(Date.now())
+  );
 }
 
-async function notifyHotspotDetectedOnce(hotspot: Hotspot): Promise<boolean> {
+async function notifyHotspotDetected(hotspot: Hotspot): Promise<boolean> {
   if (Platform.OS === "web") return false;
-  if (await hasSentCrowdSenseNotification()) return false;
+  // Per-hotspot 2-hour cooldown — re-entering a different hotspot can fire,
+  // but pacing back and forth at the same one stays quiet.
+  if (await hasNotifiedHotspotRecently(hotspot.id)) return false;
 
   const granted = await ensureNotificationPermission().catch(() => false);
   if (!granted) return false;
 
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: "CySense CrowdSense",
-      body: `You are in ${hotspot.name}. Anonymous hotspot snapshot sent.`,
+      title: `You're at ${hotspot.name}`,
+      body: "Tap to share a quick snapshot for this space.",
+      // Deep-link payload — _layout.tsx's notification-tap handler reads
+      // this and routes the user straight to the location detail page.
+      data: { url: `/location/${hotspot.id}` },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -169,7 +188,7 @@ async function notifyHotspotDetectedOnce(hotspot: Hotspot): Promise<boolean> {
     },
   });
 
-  await markCrowdSenseNotificationSent();
+  await markHotspotNotified(hotspot.id);
   return true;
 }
 
@@ -309,7 +328,7 @@ async function handleHotspotDetection(
   date = new Date()
 ): Promise<{ snapshotSent: boolean; notificationSent: boolean }> {
   const snapshotSent = await sendPresenceSnapshot(hotspot.id, date);
-  const notificationSent = await notifyHotspotDetectedOnce(hotspot);
+  const notificationSent = await notifyHotspotDetected(hotspot);
   return { snapshotSent, notificationSent };
 }
 
@@ -389,13 +408,19 @@ export async function enableCrowdSense(): Promise<{
   backgroundActive: boolean;
   message?: string;
 }> {
-  // This runs every time the user toggles CrowdSense on. The OS may only
-  // show the permission dialog once, but we still verify consent each time.
+  // Step 1 is the only step that's allowed to throw. If the user denies
+  // foreground permission we can't proceed at all.
   const foreground = await Location.requestForegroundPermissionsAsync();
   if (foreground.status !== "granted") {
     throw new Error("Foreground location permission is required to enable CrowdSense.");
   }
 
+  // From here on, the user has granted foreground location — that's enough
+  // to claim "enabled" from the app's perspective (the map view's nearby
+  // checks only need foreground). Flip the storage flag IMMEDIATELY so
+  // any later phone-only hiccup (Android background permission throwing,
+  // task-already-running races on iOS, etc.) can't leave the flag false.
+  // Every step below is best-effort, all errors swallowed.
   await setCrowdSenseEnabled(true);
   await ensureNotificationPermission().catch(() => false);
 
@@ -406,28 +431,49 @@ export async function enableCrowdSense(): Promise<{
     };
   }
 
-  const background = await Location.requestBackgroundPermissionsAsync();
-  if (background.status !== "granted") {
-    return {
-      backgroundActive: false,
-      message: "Background permission was not granted. Manual nearby checks still work.",
-    };
+  let backgroundActive = false;
+  try {
+    const background = await Location.requestBackgroundPermissionsAsync();
+    if (background.status === "granted") {
+      const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(
+        CROWDSENSE_LOCATION_TASK
+      ).catch(() => false);
+
+      if (alreadyStarted) {
+        backgroundActive = true;
+      } else {
+        try {
+          await Location.startLocationUpdatesAsync(CROWDSENSE_LOCATION_TASK, {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 5 * 60 * 1000,
+            distanceInterval: 75,
+            pausesUpdatesAutomatically: false,
+            showsBackgroundLocationIndicator: true,
+            foregroundService: {
+              notificationTitle: "CySense CrowdSense",
+              notificationBody:
+                "CySense is using anonymous location snapshots for crowd estimates.",
+            },
+          });
+          backgroundActive = true;
+        } catch (e) {
+          console.warn("[crowdSense] startLocationUpdatesAsync warning:", e);
+        }
+      }
+    }
+  } catch (e) {
+    // requestBackgroundPermissionsAsync can throw outright on some phones
+    // (Android in particular). Foreground is already granted and storage
+    // flag is already set, so we degrade gracefully.
+    console.warn("[crowdSense] requestBackgroundPermissionsAsync warning:", e);
   }
 
-  await Location.startLocationUpdatesAsync(CROWDSENSE_LOCATION_TASK, {
-    accuracy: Location.Accuracy.Balanced,
-    timeInterval: 5 * 60 * 1000,
-    distanceInterval: 75,
-    pausesUpdatesAutomatically: false,
-    showsBackgroundLocationIndicator: true,
-    foregroundService: {
-      notificationTitle: "CySense CrowdSense",
-      notificationBody:
-        "CySense is using anonymous location snapshots for crowd estimates.",
-    },
-  });
-
-  return { backgroundActive: true };
+  return {
+    backgroundActive,
+    message: backgroundActive
+      ? undefined
+      : "Background permission was not granted. Manual nearby checks still work.",
+  };
 }
 
 export async function disableCrowdSense(): Promise<void> {

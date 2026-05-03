@@ -338,9 +338,15 @@ const styles = StyleSheet.create({
 
   persistentHeader: {
     position: "absolute",
-    left: 28,
-    right: 28,
+    left: 0,
+    right: 0,
     top: 0,
+    paddingHorizontal: 28,
+    paddingBottom: spacing.md,
+    // Solid page-coloured strip so SnapPage content scrolling toward the
+    // top is masked by the header band instead of bleeding visibly through
+    // the ABOUT title and gold rule.
+    backgroundColor: colors.background,
     zIndex: 10,
   },
   bigAbout: {

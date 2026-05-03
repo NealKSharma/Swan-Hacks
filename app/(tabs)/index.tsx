@@ -695,7 +695,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   pickTitle: {
-    fontSize: 36,
+    fontSize: 30,
     fontWeight: "700",
     color: colors.text,
     letterSpacing: -0.8,

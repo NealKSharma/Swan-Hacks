@@ -18,6 +18,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { Button } from "@/components/Button";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { MetricBadge } from "@/components/MetricBadge";
 import { RoomAvailabilityCard } from "@/components/RoomAvailabilityCard";
 import { TrendBars } from "@/components/TrendBars";
@@ -170,7 +171,7 @@ export default function LocationDetailScreen() {
       <View style={[styles.canvas, { paddingTop: insets.top + spacing.md }]}>
         <Stack.Screen options={{ headerShown: false }} />
         <BackRow onPress={() => router.back()} />
-        <Text style={styles.muted}>Loading…</Text>
+        <LoadingIndicator />
       </View>
     );
   }

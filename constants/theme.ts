@@ -35,6 +35,7 @@ export const colors = {
   cardinalDeep: "#A50D26",      // pressed / strong text
   cardinalSoft: "#FBE5E8",      // subtle backgrounds, highlights
   gold: "#F1BE48",              // secondary accent
+  goldDeep: "#a9832a",              // secondary accent
   goldSoft: "#FBF0D0",          // subtle accent backgrounds
 
   // Functional aliases. these used to point at a calm blue.

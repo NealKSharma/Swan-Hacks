@@ -23,6 +23,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { Icon } from "@/components/Icon";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { colors, radii, spacing, typography } from "@/constants/theme";
 import { formatTimeRange } from "@/utils/formatting";
 import type {
@@ -53,11 +54,7 @@ export function RoomAvailabilityCard({ availability, loading }: Props) {
   }, [firstGroupKey]);
 
   if (loading) {
-    return (
-      <View style={styles.stateBlock}>
-        <Text style={styles.stateText}>Checking live availability…</Text>
-      </View>
-    );
+    return <LoadingIndicator />;
   }
 
   if (!availability) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
@@ -10,6 +10,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
+import { LoadingIndicator } from "@/components/LoadingIndicator";
 import { ScreenFade } from "@/components/ScreenFade";
 import { colors, radii, shadows, spacing, typography } from "@/constants/theme";
 import { usePreferences } from "@/lib/preferencesStore";
@@ -44,7 +45,7 @@ export default function PreferencesScreen() {
               <View style={styles.titleRule} />
             </View>
           </View>
-          <Text style={styles.muted}>Loading…</Text>
+          <LoadingIndicator />
         </View>
       </ScreenFade>
     );
@@ -233,34 +234,42 @@ function ToggleRow({
 // ----------------------------------------------------------------
 
 function LocationSharingPill() {
+  // Animation is driven DIRECTLY from the toggle action, not from a
+  // useEffect on [enabled]. That means nothing except a completed toggle
+  // can animate the pill — no mount race, no late re-render, no stray
+  // state update can flash the colour. `enabled` is purely a label-state
+  // signal; the visible colour is owned by the toggle's resolution.
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  const inFlight = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const sel = useSharedValue(0);
   const press = useSharedValue(0);
 
-  // Read the current enabled state once on mount so the pill renders in
-  // the right colour on first paint.
+  // On mount, set sel.value DIRECTLY (no animation) to whatever the
+  // storage flag says. If the user later sees a remount, the pill snaps
+  // straight to the right colour with no fade — never a flash.
   useEffect(() => {
     let cancelled = false;
     isCrowdSenseEnabled()
       .then((v) => {
-        if (cancelled) return;
+        if (cancelled || !mountedRef.current) return;
         setEnabled(v);
         sel.value = v ? 1 : 0;
       })
-      .catch(() => {
-        /* silent — pill stays Off */
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [sel]);
-
-  // Drive the colour crossfade whenever the toggle resolves.
-  useEffect(() => {
-    sel.value = withTiming(enabled ? 1 : 0, { duration: 240 });
-  }, [enabled, sel]);
 
   const pillStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
@@ -286,22 +295,38 @@ function LocationSharingPill() {
   }));
 
   async function toggle() {
-    if (busy) return;
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
-    const next = !enabled;
+
     try {
-      if (next) {
-        await enableCrowdSense();
-      } else {
+      if (enabled) {
         await disableCrowdSense();
+      } else {
+        await enableCrowdSense();
       }
-      setEnabled(next);
     } catch {
-      // Permission denied or some other failure — leave state as-is. The
-      // pill colour stays correct because we never optimistically updated.
-    } finally {
+      /* swallow — we read the actual state below regardless */
+    }
+
+    // Read the real, settled state from storage and drive both the label
+    // (setEnabled) and the colour (sel.value) atomically here. Because the
+    // animation lives inside the toggle and not in a useEffect, nothing
+    // can re-trigger it from a stray re-render — the only path to a colour
+    // change is this single point at the end of a completed user action.
+    let actual = enabled;
+    try {
+      actual = await isCrowdSenseEnabled();
+    } catch {
+      /* leave actual at the previous value */
+    }
+
+    if (mountedRef.current) {
+      setEnabled(actual);
+      sel.value = withTiming(actual ? 1 : 0, { duration: 240 });
       setBusy(false);
     }
+    inFlight.current = false;
   }
 
   return (
@@ -340,7 +365,7 @@ const styles = StyleSheet.create({
 
   header: {
     gap: 8,
-    paddingBottom: spacing.xl,
+    paddingBottom: spacing.lg,
   },
   bigTitle: {
     fontSize: 44,
@@ -366,20 +391,20 @@ const styles = StyleSheet.create({
   },
 
   cardStack: {
-    gap: spacing.lg,
+    gap: spacing.md,
     flexShrink: 1,
   },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.xl,
-    gap: spacing.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
     ...shadows.card,
   },
   toggleRow: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
-    padding: spacing.xl,
+    padding: spacing.lg,
     flexDirection: "row",
     alignItems: "center",
     ...shadows.card,
@@ -414,7 +439,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: spacing.lg,
     borderRadius: radii.pill,
     ...shadows.card,
