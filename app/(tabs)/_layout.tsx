@@ -7,10 +7,13 @@ export default function TabsLayout() {
       tabBar={(props) => <PillTabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        // Fade between tabs: feels calm, doesn't fight the home's snap-pop
-        // or the about page's pseudo-scroll. Built in via @react-navigation
-        // bottom-tabs v7.
-        animation: "fade",
+        // No tab animation: instant swap. Both "fade" and "shift" in
+        // @react-navigation/bottom-tabs v7 can intermittently leave a
+        // destination tab not rendering when its tree contains heavy
+        // Reanimated content (snap pager, draggable sliders, FlatList).
+        // Removing the animation eliminates the variable. Each screen
+        // has its own internal motion already.
+        animation: "none",
         lazy: false,
       }}
     >

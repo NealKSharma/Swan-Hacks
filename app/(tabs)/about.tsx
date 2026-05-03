@@ -16,6 +16,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
+import { ScreenFade } from "@/components/ScreenFade";
 import { colors, spacing, typography } from "@/constants/theme";
 
 const HEADER_BLOCK_HEIGHT = 130;
@@ -43,6 +44,7 @@ export default function AboutScreen() {
   const pageHeight = windowHeight;
 
   return (
+    <ScreenFade>
     <View style={styles.canvas}>
       <View
         pointerEvents="box-none"
@@ -80,6 +82,7 @@ export default function AboutScreen() {
 
       <PageDots count={PAGE_COUNT} scrollY={scrollY} pageHeight={pageHeight} />
     </View>
+    </ScreenFade>
   );
 }
 
@@ -214,7 +217,7 @@ function IntroSlide() {
         shows which campus spaces are calm or loud right now, based on what
         other ISU students are seeing.
       </Text>
-      <Text style={styles.bodySmall}>
+      <Text style={styles.body}>
         Useful if you&apos;re sensitive to noise or crowds. Useful if you&apos;re just
         sick of finding the library packed.
       </Text>

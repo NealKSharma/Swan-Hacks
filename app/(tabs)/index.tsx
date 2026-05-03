@@ -19,6 +19,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
+import { ScreenFade } from "@/components/ScreenFade";
 import { colors, radii, spacing, typography } from "@/constants/theme";
 import {
   listAllRecentReports,
@@ -109,6 +110,7 @@ export default function HomeScreen() {
   const pageHeight = windowHeight;
 
   return (
+    <ScreenFade>
     <View style={styles.canvas}>
       {/* Decorative blobs. fixed to viewport */}
       <View style={[styles.blobTop,    { top: insets.top - 100 }]} />
@@ -159,6 +161,7 @@ export default function HomeScreen() {
 
       <PageDots count={PAGE_COUNT} scrollY={scrollY} pageHeight={pageHeight} />
     </View>
+    </ScreenFade>
   );
 }
 

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
 import { Screen } from "@/components/Screen";
+import { ScreenFade } from "@/components/ScreenFade";
 import { colors, radii, spacing, typography } from "@/constants/theme";
 import { usePreferences } from "@/lib/preferencesStore";
 import type { Level } from "@/types";
@@ -21,13 +22,16 @@ export default function PreferencesScreen() {
 
   if (!loaded) {
     return (
-      <Screen contentContainerStyle={{ paddingTop: spacing.xl }}>
-        <Text style={styles.muted}>Loading…</Text>
-      </Screen>
+      <ScreenFade>
+        <Screen contentContainerStyle={{ paddingTop: spacing.xl }}>
+          <Text style={styles.muted}>Loading…</Text>
+        </Screen>
+      </ScreenFade>
     );
   }
 
   return (
+    <ScreenFade>
     <Screen contentContainerStyle={{ paddingTop: spacing.xl }}>
       <View style={styles.header}>
         <View style={styles.headerBlob} />
@@ -68,6 +72,7 @@ export default function PreferencesScreen() {
         onChange={(v) => update({ preferQuiet: v })}
       />
     </Screen>
+    </ScreenFade>
   );
 }
 

@@ -3,22 +3,20 @@ import { Link } from "expo-router";
 import { colors, radii, shadows, spacing, typography } from "@/constants/theme";
 import { SensoryStatusPill } from "@/components/SensoryStatusPill";
 import { MetricBadge } from "@/components/MetricBadge";
-import { timeAgo } from "@/utils/formatting";
 import type { Location, SensorySummary } from "@/types";
 
 interface Props {
   location: Location;
   summary: SensorySummary;
-  reasons?: string[];
 }
 
-export function LocationCard({ location, summary, reasons }: Props) {
+export function LocationCard({ location, summary }: Props) {
   return (
     <Link href={`/location/${location.slug}`} asChild>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel={`${location.name}. ${summary.status}. Tap for details.`}
-        style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]}
+        style={({ pressed }) => [styles.card, pressed && { opacity: 0.88 }]}
       >
         <View style={styles.header}>
           <View style={{ flex: 1, paddingRight: spacing.sm }}>
@@ -31,24 +29,7 @@ export function LocationCard({ location, summary, reasons }: Props) {
         <View style={styles.metrics}>
           <MetricBadge metric="noise" value={summary.noise} compact />
           <MetricBadge metric="crowd" value={summary.crowd} compact />
-          <MetricBadge metric="seating" value={summary.seating} compact />
         </View>
-
-        {reasons && reasons.length > 0 && (
-          <View style={styles.reasonRow}>
-            {reasons.slice(0, 2).map((r) => (
-              <Text key={r} style={styles.reasonChip}>
-                {r}
-              </Text>
-            ))}
-          </View>
-        )}
-
-        <Text style={styles.footer}>
-          {summary.reportCount > 0
-            ? `${summary.reportCount} report${summary.reportCount === 1 ? "" : "s"} • Updated ${timeAgo(summary.lastReportedAt)}`
-            : "No recent reports. Tap to be the first."}
-        </Text>
       </Pressable>
     </Link>
   );
@@ -59,8 +40,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
     gap: spacing.md,
     ...shadows.card,
   },
@@ -71,20 +50,22 @@ const styles = StyleSheet.create({
   },
   category: {
     ...typography.caption,
-    color: colors.textSubtle,
+    color: colors.cardinal,
     textTransform: "uppercase",
+    letterSpacing: 1,
+    fontWeight: "700",
   },
-  name: { ...typography.heading, color: colors.text, marginTop: 2 },
-  metrics: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  reasonRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  reasonChip: {
-    ...typography.small,
+  name: {
+    fontSize: 22,
+    fontWeight: "700",
     color: colors.text,
-    backgroundColor: colors.accentSoft,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: radii.pill,
-    overflow: "hidden",
+    letterSpacing: -0.4,
+    marginTop: 2,
   },
-  footer: { ...typography.small, color: colors.textMuted },
+  metrics: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+    marginTop: 6,
+  },
 });
