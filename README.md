@@ -1,30 +1,70 @@
 # CySense
 
-A sensory-aware campus companion for Iowa State University. It helps students
-find calmer, less crowded, more usable spaces using a mix of crowdsourced
-reports, opt-in location signals for zone presence, on-device decibel readings,
-and live study-room openings where LibCal data is available.
+CySense is a campus app designed to help students at Iowa State University find spaces that match their comfort level. It provides real-time and past information about noise, crowd levels, seating, and lighting, so students can decide where to study or relax. The app is especially helpful for students who feel overwhelmed in busy environments, but it works for anyone looking for a quieter or more focused space. By using simple, anonymous reports, CySense makes it easier to move around campus in a way that feels more comfortable and manageable. 
 
-Built for Swan Hacks. Privacy-first by design.
+---
 
-### How privacy works
+## Features
 
-CySense never requires an account and never stores who submitted a report.
-Three categories of input feed the app, and the two that touch the device
-are strictly opt-in:
+- **Live Campus Conditions** - See real time updates on noise levels, crowd density, seating availability, and lighting across different campus locations.
+- **Interactive Map and List View**  - Explore spaces using a map with highlighted hot zones or switch to a list view to quickly browse and compare locations. Filter by categories like academic buildings, dining, recreation, and outdoor areas.
+- **Location Details** - Tap on any location to view detailed information including current conditions, popular times, recent anonymous reports, and an overall sensory status.
+- **Crowdsourced Reports** - Students can submit quick, anonymous reports about their surroundings using simple sliders. These reports help keep data fresh and accurate for everyone.
+- **Sound Detection** - Users can optionally measure the current noise level using their phone’s microphone. The app only captures an average sound level and does not store any audio.
+- **QR Code Integration** - Locations can be linked to QR codes around campus so students can instantly view conditions or submit a report by scanning.
+- **Personalized Recommendations** - The home page highlights the best spots based on current conditions and the user’s preferences, making it easier to find a comfortable place quickly.
+- **User Preferences** - Customize settings like maximum noise and crowd levels, prioritize quieter spaces, and save preferred locations to tailor recommendations.
+- **Historical Trends** - View predicted busy times for each location based on past data, helping students plan ahead and avoid peak hours.
+- **Privacy First Design** - No personal tracking, no stored audio, and all reports are anonymous. Data is aggregated to protect user privacy while still being useful.
 
-1. **Anonymous reports** — what students manually share about a space (noise,
-   crowd, seating, lighting, optional comment). No identity is attached.
-2. **Opt-in location** — if the user grants permission, we resolve their
-   device's location to a coarse campus zone (e.g. "Parks Library"). We do
-   not store exact coordinates and we do not store the path between zones.
-   Tracking is off by default and the app works fine without it.
-3. **On-device decibel** — when a report is submitted, we can measure the
-   ambient decibel level locally on the phone. Only the number leaves the
-   device. No raw audio is ever recorded, transmitted, or stored.
+---
 
-If a user declines location or microphone access, the app still works; only
-manual reports contribute. That is intentional.
+## Pages
+
+**Home Page** <br>
+The home page gives a quick overview of campus conditions. It highlights the best quiet spot at the moment, shows a few recommended locations, and includes basic privacy information so users understand how their data is handled.
+
+**Spaces Page** <br>
+This page is the core of the app. It opens with a map that shows campus buildings and highlights how busy or loud each space is based on live data from the backend. Users can tap on a building to see more details like current noise, crowd level, popular times based on past data, recent anonymous reports, and an option to submit a report.
+
+There is also a list view option that shows all locations in a simple scrollable format. In this view, users can sort spaces by categories like academic buildings, recreation centers, dining, or outdoor areas. Each location still shows key details and allows users to submit reports.
+
+When submitting a report, users can adjust sliders for crowd and noise levels. There is also an option to quickly measure sound using the phone’s microphone for a couple of seconds. The app only captures the average noise level and does not store any audio. Once submitted, the report updates the location’s data by combining it with recent reports.
+
+**Preferences Page** <br>
+This page lets users customize their experience. They can set their preferred maximum noise and crowd levels, choose to prioritize quieter spaces, and select favorite locations. These preferences are used to recommend better spots on the home page. Users can also manage permissions like notifications, location access, and microphone access here.
+
+**About Page** <br>
+The about page explains what CySense is, how it works, and how it protects user privacy. It also gives a quick look at future ideas like better predictions, more data sources, and expanded features.
+
+---
+
+## Install
+
+```bash
+cd Swan-Hacks
+npm install
+npm install -g supabase
+```
+
+---
+
+## Run locally
+
+```bash
+npx expo start
+npx expo start --ios
+npx expo start --web
+```
+
+Out of the box you will see mock ISU data. The Student Innovation Center detail
+page also shows mock room openings until the LibCal bridge is deployed.
+
+---
+
+## Tech Stack
+
+Expo React Native with TypeScript for the frontend, Expo Router for navigation, and Supabase for the backend and database. The app is designed to work on both mobile and web using a shared codebase.
 
 ---
 
@@ -46,143 +86,10 @@ configured, so the app is still demoable with zero setup.
 
 ---
 
-## 1. Install
+## Team
 
-```bash
-cd Swan-Hacks
-npm install
-```
+**Trice Buchanan**
 
-If you do not have the Supabase CLI yet:
+**Devank Uppal**
 
-```bash
-npm install -g supabase
-```
-
----
-
-## 2. Run locally
-
-```bash
-npx expo start
-npx expo start --ios
-npx expo start --web
-```
-
-Out of the box you will see mock ISU data. The Student Innovation Center detail
-page also shows mock room openings until the LibCal bridge is deployed.
-
----
-
-## 3. Set up Supabase
-
-1. Create a project at <https://supabase.com>.
-2. In the Supabase SQL editor, paste and run [supabase/schema.sql](supabase/schema.sql).
-3. Paste and run [supabase/seed.sql](supabase/seed.sql).
-4. In Project Settings -> API, copy the Project URL and `anon` key.
-5. Create a `.env` file in the project root:
-
-```env
-EXPO_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-```
-
-6. Deploy the LibCal bridge function:
-
-```bash
-supabase functions deploy libcal-availability
-```
-
-7. Restart Expo.
-
-The schema adds optional LibCal metadata on `locations`, and the edge function
-fetches the public Iowa State LibCal page, replays the hidden availability-grid
-POST, and returns normalized room slots to the app.
-
----
-
-## 4. LibCal integration
-
-CySense does not attempt to complete room bookings inside the app. It reads
-public availability from LibCal and links the user out to the official booking
-page to finish the reservation.
-
-Current supported location:
-
-- Student Innovation Center: `https://sictr-iastate.libcal.com/spaces?lid=15606&gid=38061&c=0`
-
-The reverse-engineered bridge lives in
-[supabase/functions/libcal-availability/index.ts](supabase/functions/libcal-availability/index.ts).
-It is intentionally isolated on the backend so the Expo client does not depend
-directly on undocumented third-party endpoints.
-
----
-
-## 5. Demo flow
-
-1. Open the app. Home shows recommended quiet spots.
-2. Compare Parks Library with Student Innovation Center.
-3. Open Student Innovation Center and show the new **Study rooms right now** card.
-4. Tap **Reserve in LibCal** to hand off to the official booking flow.
-5. Submit an anonymous sensory report to show the original CySense loop still works.
-
----
-
-## 6. What we deliberately did not build
-
-- Production auth
-- Real background location tracking
-- Audio recording
-- Complex maps
-- ML-based predictions
-- In-app booking against LibCal's private endpoint
-
-Keeping those out of the MVP is deliberate. The app stays demo-ready without
-overengineering.
-
----
-
-## Custom icons
-
-The app uses inline Lucide-style SVG icons via `react-native-svg`, mapped through
-`components/Icon.tsx`. To swap any icon for a custom design:
-
-1. Drop your SVG file at `assets/icons/<name>.svg` (see "icon names" below).
-   Stick to a 24×24 viewBox with stroke-based artwork to match the rest.
-2. In `components/Icon.tsx`, find the matching `Icon<Name>` const and replace
-   its body with:
-
-   ```tsx
-   import Custom from "@/assets/icons/<name>.svg";
-   const IconQuiet: ComponentType<InternalProps> = (p) => (
-     <Custom width={p.size} height={p.size} stroke={p.color} strokeWidth={p.strokeWidth} />
-   );
-   ```
-
-The `react-native-svg-transformer` config in `metro.config.js` makes any
-`.svg` import work as a React component automatically.
-
-### Icon names
-
-| Filename               | Used for                                |
-| ---------------------- | --------------------------------------- |
-| `metric-noise.svg`     | Metric badge — Noise                    |
-| `metric-crowd.svg`     | Metric badge — Crowd                    |
-| `metric-seating.svg`   | Metric badge — Seating                  |
-| `metric-lighting.svg`  | Metric badge — Lighting                 |
-| `chevron-right.svg`    | Forward CTAs / "Read more" / arrows     |
-| `nav-home.svg`         | Tab bar — Home                          |
-| `nav-compass.svg`      | Tab bar — Spaces                        |
-| `nav-filter.svg`       | Tab bar — Preferences                   |
-| `nav-info.svg`         | Tab bar — About                         |
-
-All SVGs use `fill="currentColor"` so they tint via the `color` prop on `<Icon>`.
-
-## File reference
-
-- [lib/dataSource.ts](lib/dataSource.ts) - app-facing read/write surface
-- [lib/libcal.ts](lib/libcal.ts) - client wrapper for live room availability
-- [constants/libcal.ts](constants/libcal.ts) - LibCal mappings and mock room data
-- [supabase/schema.sql](supabase/schema.sql) - tables and RLS policies
-- [supabase/seed.sql](supabase/seed.sql) - ISU seed data plus LibCal metadata
-- [supabase/functions/libcal-availability/index.ts](supabase/functions/libcal-availability/index.ts) - reverse-engineered LibCal bridge
+**Neal Kaushik Sharma**
