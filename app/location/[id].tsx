@@ -34,6 +34,8 @@ import type {
 
 type Tab = "info" | "activity" | "rooms";
 
+const POPULAR_TIMES_HOURS = Array.from({ length: 14 }, (_, i) => 8 + i);
+
 export default function LocationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -294,15 +296,26 @@ function ActivityPanel({
   trends: HourlyTrend[];
 }) {
   const now = new Date();
+  const today = now.getDay();
+  const currentHour = now.getHours();
+  const predictedTrends = useMemo(
+    () => predictTodayTrends(trends, today),
+    [trends, today]
+  );
+
   return (
     <View style={styles.panelInner}>
       <Text style={styles.subHeading}>Popular times today</Text>
-      <Text style={styles.subCaption}>{dayLabel(now.getDay())}</Text>
-      <TrendBars
-        trends={trends}
-        dayOfWeek={now.getDay()}
-        highlightHour={now.getHours()}
-      />
+      <Text style={styles.subCaption}>{dayLabel(today)}</Text>
+      {predictedTrends.length === 0 ? (
+        <Text style={styles.bodySmall}>No historical trend data yet.</Text>
+      ) : (
+        <TrendBars
+          trends={predictedTrends}
+          dayOfWeek={today}
+          highlightHour={currentHour}
+        />
+      )}
 
       <Text style={[styles.subHeading, { marginTop: spacing.lg }]}>
         Recent anonymous reports
@@ -321,6 +334,84 @@ function ActivityPanel({
       )}
     </View>
   );
+}
+
+function predictTodayTrends(
+  trends: HourlyTrend[],
+  today: number
+): HourlyTrend[] {
+  if (trends.length === 0) {
+    return trends;
+  }
+
+  const predictions = POPULAR_TIMES_HOURS.map((hour) => {
+    const crowd = predictMetric(trends, today, hour, "avg_crowd");
+    const noise = predictMetric(trends, today, hour, "avg_noise");
+
+    if (crowd.value === null && noise.value === null) {
+      return null;
+    }
+
+    const prediction: HourlyTrend = {
+      id: `predicted-${today}-${hour}`,
+      location_id: trends[0]?.location_id ?? "predicted",
+      day_of_week: today,
+      hour,
+      avg_crowd: crowd.value,
+      avg_noise: noise.value,
+      avg_seating: null,
+      avg_lighting: null,
+      sample_count: Math.max(1, Math.round(Math.max(crowd.weight, noise.weight))),
+    };
+
+    return prediction;
+  }).filter((trend): trend is HourlyTrend => trend !== null);
+
+  // If historical report averages cannot produce a usable estimate,
+  // leave the original data alone so TrendBars keeps its existing empty state.
+  return predictions.length > 0 ? predictions : trends;
+}
+
+function predictMetric(
+  trends: HourlyTrend[],
+  dayOfWeek: number,
+  hour: number,
+  metric: "avg_crowd" | "avg_noise"
+): { value: number | null; weight: number } {
+  let weightedTotal = 0;
+  let totalWeight = 0;
+
+  const add = (value: number | null | undefined, weight: number) => {
+    if (value == null || weight <= 0) return;
+    weightedTotal += value * weight;
+    totalWeight += weight;
+  };
+
+  for (const trend of trends) {
+    const sampleWeight = Math.max(1, trend.sample_count || 1);
+    const hourDistance = Math.abs(trend.hour - hour);
+
+    // Prediction priority:
+    // 1. Same day and same hour is treated as the strongest signal.
+    // 2. Same day nearby hours help fill small gaps in historical report data.
+    // 3. Same hour on other days is a light fallback for sparse locations.
+    if (trend.day_of_week === dayOfWeek && trend.hour === hour) {
+      add(trend[metric], sampleWeight * 4);
+    } else if (trend.day_of_week === dayOfWeek && hourDistance <= 2) {
+      add(trend[metric], sampleWeight / (hourDistance + 1));
+    } else if (trend.hour === hour) {
+      add(trend[metric], sampleWeight * 0.5);
+    }
+  }
+
+  if (totalWeight === 0) {
+    return { value: null, weight: 0 };
+  }
+
+  return {
+    value: Math.max(1, Math.min(5, weightedTotal / totalWeight)),
+    weight: totalWeight,
+  };
 }
 
 function dayLabel(d: number): string {

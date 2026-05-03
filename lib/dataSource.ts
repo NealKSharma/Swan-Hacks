@@ -6,7 +6,6 @@ import { getSupabase, supabaseConfigured } from "@/lib/supabase";
 import {
   MOCK_LOCATIONS,
   MOCK_REPORTS,
-  MOCK_TRENDS,
 } from "@/constants/campusLocations";
 import type { HourlyTrend, Location, NewReport, Report } from "@/types";
 
@@ -16,6 +15,17 @@ export const dataSourceMode: "supabase" | "mock" = supabaseConfigured
 
 // In-memory store so submitted reports show up immediately in mock mode.
 const mockReports: Report[] = [...MOCK_REPORTS];
+
+const trendCache = new Map<string, { dateKey: string; trends: HourlyTrend[] }>();
+
+function todayCacheKey(): string {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+}
 
 export async function listLocations(): Promise<Location[]> {
   const sb = getSupabase();
@@ -120,21 +130,94 @@ export async function listAllRecentReports(
 export async function listTrends(locationId: string): Promise<HourlyTrend[]> {
   const sb = getSupabase();
   if (!sb) {
-    return MOCK_TRENDS.filter((t) => t.location_id === locationId);
+    return [];
   }
+
+  // Popular-time history is derived from real reports, not a prefilled trend
+  // table. Cache the derived buckets for the current local day so opening the
+  // same location repeatedly does not keep scanning the reports table.
+  const dateKey = todayCacheKey();
+  const cached = trendCache.get(locationId);
+  if (cached?.dateKey === dateKey) {
+    return cached.trends;
+  }
+
   const { data, error } = await sb
-    .from("location_hourly_trends")
-    .select("*")
-    .eq("location_id", locationId);
+    .from("reports")
+    .select("id, location_id, noise_level, crowd_level, anonymous_session_id, created_at")
+    .eq("location_id", locationId)
+    .order("created_at", { ascending: false })
+    .limit(5000);
   if (error) {
     console.warn("[dataSource] listTrends failed:", error.message);
     return [];
   }
-  return (data ?? []) as HourlyTrend[];
+
+  const trends = buildHourlyTrendsFromReports(locationId, (data ?? []) as Report[]);
+  trendCache.set(locationId, { dateKey, trends });
+  return trends;
+}
+
+function buildHourlyTrendsFromReports(
+  locationId: string,
+  reports: Report[]
+): HourlyTrend[] {
+  const buckets = new Map<
+    string,
+    {
+      dayOfWeek: number;
+      hour: number;
+      noiseTotal: number;
+      crowdTotal: number;
+      sampleCount: number;
+    }
+  >();
+
+  for (const report of reports) {
+    const reportedAt = new Date(report.created_at);
+    if (Number.isNaN(reportedAt.getTime())) continue;
+
+    // Group raw reports by weekday + hour. The screen can then run its simple
+    // prediction pass over these database-derived averages.
+    const dayOfWeek = reportedAt.getDay();
+    const hour = reportedAt.getHours();
+    const key = `${dayOfWeek}-${hour}`;
+    const bucket = buckets.get(key) ?? {
+      dayOfWeek,
+      hour,
+      noiseTotal: 0,
+      crowdTotal: 0,
+      sampleCount: 0,
+    };
+
+    bucket.noiseTotal += report.noise_level;
+    bucket.crowdTotal += report.crowd_level;
+    bucket.sampleCount += 1;
+    buckets.set(key, bucket);
+  }
+
+  return Array.from(buckets.values())
+    .map((bucket) => ({
+      id: `report-trend-${locationId}-${bucket.dayOfWeek}-${bucket.hour}`,
+      location_id: locationId,
+      day_of_week: bucket.dayOfWeek,
+      hour: bucket.hour,
+      avg_noise: roundTrendAverage(bucket.noiseTotal / bucket.sampleCount),
+      avg_crowd: roundTrendAverage(bucket.crowdTotal / bucket.sampleCount),
+      avg_seating: null,
+      avg_lighting: null,
+      sample_count: bucket.sampleCount,
+    }))
+    .sort((a, b) => a.day_of_week - b.day_of_week || a.hour - b.hour);
+}
+
+function roundTrendAverage(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 export async function submitReport(report: NewReport): Promise<Report> {
   const sb = getSupabase();
+  trendCache.delete(report.location_id);
   if (!sb) {
     const created: Report = {
       ...report,

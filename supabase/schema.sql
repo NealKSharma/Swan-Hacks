@@ -42,18 +42,10 @@ create table if not exists public.reports (
 create index if not exists reports_location_recent_idx
   on public.reports (location_id, created_at desc);
 
-create table if not exists public.location_hourly_trends (
-  id            uuid primary key default gen_random_uuid(),
-  location_id   uuid not null references public.locations(id) on delete cascade,
-  day_of_week   smallint not null check (day_of_week between 0 and 6), -- 0=Sun
-  hour          smallint not null check (hour between 0 and 23),
-  avg_noise     numeric(3,2),
-  avg_crowd     numeric(3,2),
-  avg_seating   numeric(3,2),
-  avg_lighting  numeric(3,2),
-  sample_count  integer not null default 0,
-  unique (location_id, day_of_week, hour)
-);
+-- Historical popular-time trends are calculated from reports in the app data
+-- layer, then cached per location for the current day. Drop the old prefilled
+-- mock trend table if it exists so the database source of truth stays reports.
+drop table if exists public.location_hourly_trends cascade;
 
 -- Convenience view: most recent 1 hour of reports per location
 create or replace view public.location_recent_status as
@@ -77,17 +69,11 @@ group by l.id;
 -- ============================================================
 alter table public.locations              enable row level security;
 alter table public.reports                enable row level security;
-alter table public.location_hourly_trends enable row level security;
 
 -- Public read access (anonymous demo users)
 drop policy if exists "locations are readable by anyone" on public.locations;
 create policy "locations are readable by anyone"
   on public.locations for select
-  using (true);
-
-drop policy if exists "trends are readable by anyone" on public.location_hourly_trends;
-create policy "trends are readable by anyone"
-  on public.location_hourly_trends for select
   using (true);
 
 drop policy if exists "reports are readable by anyone" on public.reports;

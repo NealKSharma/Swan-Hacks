@@ -1,7 +1,7 @@
 // Mock data used when Supabase isn't configured. Mirrors the shape of the
 // real Supabase tables so the rest of the app can be data-source-agnostic.
 
-import type { HourlyTrend, Location, Report } from "@/types";
+import type { Location, Report } from "@/types";
 
 const ISO_NOW = () => new Date().toISOString();
 
@@ -227,51 +227,4 @@ function r(
     anonymous_session_id: null,
     created_at: minutesAgo(agoMin),
   };
-}
-
-// Mock weekday hourly trends. same shape as the SQL seed, used for the
-// "popular times" bars when Supabase is not configured.
-export const MOCK_TRENDS: HourlyTrend[] = (() => {
-  const out: HourlyTrend[] = [];
-  for (const loc of MOCK_LOCATIONS) {
-    for (let d = 1; d <= 5; d++) {
-      for (let h = 8; h <= 21; h++) {
-        const baseCrowd = 1 + 4 * Math.exp(-Math.pow(h - 13, 2) / 18);
-        let crowd = baseCrowd;
-        let noise = 1 + 3.5 * Math.exp(-Math.pow(h - 13, 2) / 22);
-        let lighting = h >= 10 && h <= 16 ? 4 : 3;
-        if (loc.category === "Library") {
-          noise *= 0.55;
-          crowd *= 0.85;
-        } else if (loc.category === "Dining") {
-          if (h === 12 || h === 18) {
-            crowd = Math.min(5, crowd + 1.2);
-            noise = Math.min(5, noise + 1.0);
-          }
-        } else if (loc.category === "Recreation") {
-          if (h >= 17 && h <= 19) crowd = Math.min(5, crowd + 1.2);
-          noise = Math.min(5, noise + 0.5);
-        } else if (loc.category === "Outdoor") {
-          if (h >= 11 && h <= 15) lighting = 5;
-        }
-        const seating = Math.max(1, 5 - 0.6 * crowd);
-        out.push({
-          id: `${loc.id}-${d}-${h}`,
-          location_id: loc.id,
-          day_of_week: d,
-          hour: h,
-          avg_noise: clamp(noise),
-          avg_crowd: clamp(crowd),
-          avg_seating: clamp(seating),
-          avg_lighting: clamp(lighting),
-          sample_count: 20,
-        });
-      }
-    }
-  }
-  return out;
-})();
-
-function clamp(n: number): number {
-  return Math.round(Math.max(1, Math.min(5, n)) * 100) / 100;
 }
