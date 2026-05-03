@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   Extrapolation,
@@ -51,6 +52,7 @@ const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
 export default function HomeScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { prefs } = usePreferences();
@@ -102,6 +104,16 @@ export default function HomeScreen() {
       load();
     }, [load])
   );
+
+  // Tap the Home tab again while already on Home → scroll back to first page.
+  useEffect(() => {
+    const unsub = navigation.addListener("tabPress" as never, () => {
+      if (navigation.isFocused()) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    });
+    return unsub;
+  }, [navigation]);
 
   const onScroll = useAnimatedScrollHandler((e) => {
     scrollY.value = e.contentOffset.y;

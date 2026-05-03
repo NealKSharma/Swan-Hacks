@@ -35,17 +35,17 @@ export function levelLabel(
   metric: "noise" | "crowd" | "seating" | "lighting",
   value: number | null
 ): string {
-  if (value == null) return "n/a";
+  if (value == null) return "N/A";
   const v = Math.round(value);
   switch (metric) {
     case "noise":
-      return ["Silent", "Quiet", "Moderate", "Loud", "Very loud"][v - 1] ?? "n/a";
+      return ["Silent", "Quiet", "Moderate", "Loud", "Very loud"][v - 1] ?? "";
     case "crowd":
-      return ["Empty", "Light", "Moderate", "Busy", "Packed"][v - 1] ?? "n/a";
+      return ["Empty", "Light", "Moderate", "Busy", "Packed"][v - 1] ?? "N/A";
     case "seating":
-      return ["None", "Few", "Some", "Plenty", "Wide open"][v - 1] ?? "n/a";
+      return ["None", "Few", "Some", "Plenty", "Wide open"][v - 1] ?? "N/A";
     case "lighting":
-      return ["Dim", "Soft", "Even", "Bright", "Harsh"][v - 1] ?? "n/a";
+      return ["Dim", "Soft", "Even", "Bright", "Harsh"][v - 1] ?? "N/A";
   }
 }
 

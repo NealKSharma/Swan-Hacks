@@ -11,6 +11,7 @@ import MetricCrowd from "@/assets/icons/metric-crowd.svg";
 import MetricSeating from "@/assets/icons/metric-seating.svg";
 import MetricLighting from "@/assets/icons/metric-lighting.svg";
 import ChevronRight from "@/assets/icons/chevron-right.svg";
+import FilterSort from "@/assets/icons/filter-sort.svg";
 import NavHome from "@/assets/icons/nav-home.svg";
 import NavCompass from "@/assets/icons/nav-compass.svg";
 import NavFilter from "@/assets/icons/nav-filter.svg";
@@ -22,6 +23,7 @@ export type IconName =
   | "metric-seating"
   | "metric-lighting"
   | "chevron-right"
+  | "filter-sort"
   | "tab-home"
   | "tab-spaces"
   | "tab-preferences"
@@ -39,6 +41,7 @@ const ICONS: Record<IconName, ComponentType<SvgProps>> = {
   "metric-seating": MetricSeating,
   "metric-lighting": MetricLighting,
   "chevron-right": ChevronRight,
+  "filter-sort": FilterSort,
   "tab-home": NavHome,
   "tab-spaces": NavCompass,
   "tab-preferences": NavFilter,

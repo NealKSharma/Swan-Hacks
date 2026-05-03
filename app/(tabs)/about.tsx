@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useFocusEffect } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
@@ -26,6 +27,7 @@ const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
 export default function AboutScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const { height: windowHeight } = useWindowDimensions();
 
   const scrollY = useSharedValue(0);
@@ -36,6 +38,16 @@ export default function AboutScreen() {
       setStatusBarStyle("dark");
     }, [])
   );
+
+  // Re-tap the About tab while already on it → snap back to first page.
+  useEffect(() => {
+    const unsub = navigation.addListener("tabPress" as never, () => {
+      if (navigation.isFocused()) {
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+      }
+    });
+    return unsub;
+  }, [navigation]);
 
   const onScroll = useAnimatedScrollHandler((e) => {
     scrollY.value = e.contentOffset.y;
@@ -330,11 +342,11 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   bigAbout: {
-    fontSize: 52,
+    fontSize: 44,
     fontWeight: "800",
     color: colors.cardinal,
     letterSpacing: -1.5,
-    lineHeight: 56,
+    lineHeight: 48,
   },
   aboutRule: {
     width: 80,
