@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { IntroOverlay } from "@/components/IntroOverlay";
 import { colors } from "@/constants/theme";
+import "@/services/crowdSense";
 
 export default function RootLayout() {
   const [introDone, setIntroDone] = useState(false);

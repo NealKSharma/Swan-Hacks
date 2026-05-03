@@ -23,7 +23,7 @@ export type IconName =
   | "metric-lighting"
   | "chevron-right"
   | "tab-home"
-  | "tab-spaces"
+  | "tab-map"
   | "tab-preferences"
   | "tab-about";
 
@@ -40,7 +40,7 @@ const ICONS: Record<IconName, ComponentType<SvgProps>> = {
   "metric-lighting": MetricLighting,
   "chevron-right": ChevronRight,
   "tab-home": NavHome,
-  "tab-spaces": NavCompass,
+  "tab-map": NavCompass,
   "tab-preferences": NavFilter,
   "tab-about": NavInfo,
 };

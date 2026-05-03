@@ -13,7 +13,7 @@ import { colors } from "@/constants/theme";
 
 const ROUTE_TO_ICON: Record<string, IconName> = {
   index: "tab-home",
-  spaces: "tab-spaces",
+  map: "tab-map",
   preferences: "tab-preferences",
   about: "tab-about",
 };

@@ -75,6 +75,43 @@ set
   libcal_capacity = 0
 where slug = 'student-innovation-center';
 
+insert into public.locations (slug, name, category, description, latitude, longitude, accessibility_notes, hotspot_radius_meters)
+values
+  ('coover-hall', 'Coover Hall', 'Academic',
+   'Engineering classrooms and labs with study nooks and foot traffic that spikes between classes.',
+   42.0284154, -93.6509803,
+   'Step-free entry. Elevator access. Seating pockets near hall intersections.',
+   150),
+  ('beardshear-hall', 'Beardshear Hall', 'Academic',
+   'Administration building near central campus with lighter traffic outside class-change windows.',
+   42.0264, -93.6483,
+   'Step-free entry. Elevator access available.',
+   45),
+  ('the-campanile', 'The Campanile', 'Outdoor',
+   'Iconic central campus landmark that can act as a precise outdoor hotspot for crowd estimates.',
+   42.0244, -93.6462,
+   'Outdoor paved access. Weather dependent.',
+   10),
+  ('jack-trice-stadium', 'Jack Trice Stadium', 'Recreation',
+   'Large event venue east of campus with highly variable crowd conditions around game and event times.',
+   42.0140, -93.6358,
+   'Accessible seating and entrances available.',
+   130),
+  ('hilton-coliseum', 'Hilton Coliseum', 'Recreation',
+   'Arena and event venue where busy-time signals can help students avoid large event surges nearby.',
+   42.0202, -93.6346,
+   'Accessible entry points and seating areas available.',
+   80)
+on conflict (slug) do nothing;
+
+update public.locations set latitude = 42.0279, longitude = -93.6491, hotspot_radius_meters = 65 where slug = 'parks-library';
+update public.locations set latitude = 42.0272, longitude = -93.6514, hotspot_radius_meters = 55 where slug = 'student-innovation-center';
+update public.locations set latitude = 42.0238, longitude = -93.6459, hotspot_radius_meters = 70 where slug = 'memorial-union';
+update public.locations set hotspot_radius_meters = 125 where slug = 'gerdin-business-building';
+update public.locations set hotspot_radius_meters = 120 where slug = 'troxel-hall';
+update public.locations set hotspot_radius_meters = 130 where slug = 'design-building';
+update public.locations set latitude = 42.0264, longitude = -93.6441, hotspot_radius_meters = 45 where slug = 'curtiss-hall';
+
 -- Hourly trends --------------------------------------------------
 -- Seeds a typical weekday curve. Demonstrates the "popular times" UI.
 -- We insert for day_of_week = 1..5 (Mon-Fri) only; weekends left empty for the MVP.

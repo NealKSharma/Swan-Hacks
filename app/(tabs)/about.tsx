@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   Extrapolation,
   interpolate,
+  type SharedValue,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -102,7 +103,7 @@ function SnapPage({
   index: number;
   pageHeight: number;
   insets: { top: number; bottom: number };
-  scrollY: Animated.SharedValue<number>;
+  scrollY: SharedValue<number>;
   children: React.ReactNode;
 }) {
   const animStyle = useAnimatedStyle(() => {
@@ -154,7 +155,7 @@ function PageDots({
   pageHeight,
 }: {
   count: number;
-  scrollY: Animated.SharedValue<number>;
+  scrollY: SharedValue<number>;
   pageHeight: number;
 }) {
   return (
@@ -172,7 +173,7 @@ function PageDot({
   pageHeight,
 }: {
   index: number;
-  scrollY: Animated.SharedValue<number>;
+  scrollY: SharedValue<number>;
   pageHeight: number;
 }) {
   const animStyle = useAnimatedStyle(() => {

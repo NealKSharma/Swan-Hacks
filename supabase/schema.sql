@@ -22,6 +22,7 @@ create table if not exists public.locations (
   libcal_lid    integer,
   libcal_gid    integer,
   libcal_capacity integer,
+  hotspot_radius_meters integer,
   created_at    timestamptz not null default now()
 );
 
@@ -29,7 +30,8 @@ alter table public.locations
   add column if not exists booking_url text,
   add column if not exists libcal_lid integer,
   add column if not exists libcal_gid integer,
-  add column if not exists libcal_capacity integer;
+  add column if not exists libcal_capacity integer,
+  add column if not exists hotspot_radius_meters integer;
 
 create table if not exists public.reports (
   id                   uuid primary key default gen_random_uuid(),
@@ -55,6 +57,19 @@ create table if not exists public.location_hourly_trends (
   unique (location_id, day_of_week, hour)
 );
 
+create table if not exists public.crowdsense_snapshots (
+  id            uuid primary key default gen_random_uuid(),
+  zone_id       text not null,
+  time_bucket   timestamptz not null,
+  anon_device_id text not null,
+  source        text not null default 'crowdsense_snapshot',
+  created_at    timestamptz not null default now(),
+  unique (zone_id, time_bucket, anon_device_id)
+);
+
+create index if not exists crowdsense_snapshots_zone_time_idx
+  on public.crowdsense_snapshots (zone_id, time_bucket desc);
+
 -- Convenience view: most recent 1 hour of reports per location
 create or replace view public.location_recent_status as
 select
@@ -72,12 +87,39 @@ left join public.reports r
  and r.created_at >= now() - interval '1 hour'
 group by l.id;
 
+create or replace function public.get_current_crowd_levels(window_minutes integer default 15)
+returns table (
+  zone_id text,
+  unique_devices bigint,
+  level text,
+  last_seen_at timestamptz
+)
+language sql
+stable
+as $$
+  select
+    s.zone_id,
+    count(distinct s.anon_device_id) as unique_devices,
+    case
+      when count(distinct s.anon_device_id) <= 1 then 'Quiet'
+      when count(distinct s.anon_device_id) <= 3 then 'Calm'
+      when count(distinct s.anon_device_id) <= 8 then 'Busy'
+      when count(distinct s.anon_device_id) <= 15 then 'Crowded'
+      else 'Overcrowded'
+    end as level,
+    max(s.created_at) as last_seen_at
+  from public.crowdsense_snapshots s
+  where s.created_at >= now() - make_interval(mins => greatest(window_minutes, 1))
+  group by s.zone_id;
+$$;
+
 -- ============================================================
 -- Row Level Security
 -- ============================================================
 alter table public.locations              enable row level security;
 alter table public.reports                enable row level security;
 alter table public.location_hourly_trends enable row level security;
+alter table public.crowdsense_snapshots   enable row level security;
 
 -- Public read access (anonymous demo users)
 drop policy if exists "locations are readable by anyone" on public.locations;
@@ -95,6 +137,11 @@ create policy "reports are readable by anyone"
   on public.reports for select
   using (true);
 
+drop policy if exists "crowdsense snapshots are readable by anyone" on public.crowdsense_snapshots;
+create policy "crowdsense snapshots are readable by anyone"
+  on public.crowdsense_snapshots for select
+  using (true);
+
 -- Anyone (anon role) can insert a report. We do NOT allow updates/deletes.
 drop policy if exists "anyone can submit a report" on public.reports;
 create policy "anyone can submit a report"
@@ -103,3 +150,10 @@ create policy "anyone can submit a report"
     noise_level between 1 and 5
     and crowd_level between 1 and 5
   );
+
+drop policy if exists "anyone can submit crowd snapshots" on public.crowdsense_snapshots;
+create policy "anyone can submit crowd snapshots"
+  on public.crowdsense_snapshots for insert
+  with check (source = 'crowdsense_snapshot');
+
+grant execute on function public.get_current_crowd_levels(integer) to anon, authenticated;

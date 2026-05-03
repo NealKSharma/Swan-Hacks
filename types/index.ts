@@ -21,6 +21,7 @@ export interface Location {
   libcal_lid?: number | null;
   libcal_gid?: number | null;
   libcal_capacity?: number | null;
+  hotspot_radius_meters?: number | null;
   created_at: string;
 }
 
@@ -76,6 +77,11 @@ export interface RoomAvailabilitySlot {
   start: string;
   end: string;
   reservation_url?: string | null;
+  libcal_eid?: string | null;
+  libcal_checksum?: string | null;
+  libcal_start?: string | null;
+  libcal_gid?: string | null;
+  libcal_lid?: string | null;
 }
 
 export interface RoomAvailabilityRoom {
@@ -93,10 +99,40 @@ export interface RoomAvailabilityGroup {
 }
 
 export interface RoomAvailabilityResponse {
-  slug: string;
+  location_slug: string;
+  location_name: string;
   date: string;
-  fetched_at: string;
   booking_page_url: string;
+  fetched_at: string;
+  source: "libcal-live" | "mock";
   note?: string | null;
   groups: RoomAvailabilityGroup[];
+}
+
+export interface Hotspot {
+  id: string;
+  name: string;
+  category: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+}
+
+export interface NearbyHotspotMatch {
+  hotspot: Hotspot;
+  distanceMeters: number;
+}
+
+export type CrowdLevelLabel =
+  | "Quiet"
+  | "Calm"
+  | "Busy"
+  | "Crowded"
+  | "Overcrowded";
+
+export interface CrowdLevel {
+  zone_id: string;
+  unique_devices: number;
+  level: CrowdLevelLabel;
+  last_seen_at: string | null;
 }

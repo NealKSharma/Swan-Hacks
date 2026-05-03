@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   Extrapolation,
   interpolate,
+  type SharedValue,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
@@ -138,7 +139,7 @@ export default function HomeScreen() {
         bounces={false}
       >
         <SnapPage index={0} pageHeight={pageHeight} insets={insets} scrollY={scrollY}>
-          <HeroSlide onBrowse={() => router.push("/spaces")} />
+          <HeroSlide onBrowse={() => router.push("/map")} />
         </SnapPage>
 
         <SnapPage index={1} pageHeight={pageHeight} insets={insets} scrollY={scrollY}>
@@ -179,7 +180,7 @@ function SnapPage({
   index: number;
   pageHeight: number;
   insets: { top: number; bottom: number };
-  scrollY: Animated.SharedValue<number>;
+  scrollY: SharedValue<number>;
   children: React.ReactNode;
 }) {
   const animStyle = useAnimatedStyle(() => {
@@ -242,7 +243,7 @@ function PageDots({
   pageHeight,
 }: {
   count: number;
-  scrollY: Animated.SharedValue<number>;
+  scrollY: SharedValue<number>;
   pageHeight: number;
 }) {
   return (
@@ -260,7 +261,7 @@ function PageDot({
   pageHeight,
 }: {
   index: number;
-  scrollY: Animated.SharedValue<number>;
+  scrollY: SharedValue<number>;
   pageHeight: number;
 }) {
   const animStyle = useAnimatedStyle(() => {
@@ -291,7 +292,7 @@ function HeroSlide({ onBrowse }: { onBrowse: () => void }) {
         Live, anonymous sensory info{"\n"}from students, for students.
       </Text>
       <View style={{ alignSelf: "flex-start", marginTop: spacing.xxl }}>
-        <Button variant="goldPill" label="Browse spaces" onPress={onBrowse} />
+        <Button variant="goldPill" label="Open CrowdSense" onPress={onBrowse} />
       </View>
     </View>
   );
