@@ -26,27 +26,32 @@ import {
   listAllRecentReports,
   listLocations,
 } from "@/lib/dataSource";
+import { getCrowdLevels } from "@/services/crowdSense";
 import { rankLocations, RankedLocation } from "@/utils/recommendations";
+import { LIVE_REPORT_WINDOW_MINUTES } from "@/utils/sensoryScore";
 import { usePreferences } from "@/lib/preferencesStore";
-import type { Report, SensoryStatus } from "@/types";
+import type { CrowdLevel, Report, SensoryStatus } from "@/types";
 
 interface Counts {
-  Quiet: number;
-  Moderate: number;
+  Empty: number;
+  Calm: number;
   Busy: number;
-  Loud: number;
+  Crowded: number;
+  Overcrowded: number;
   total: number;
 }
 
 const STAT_ROWS: { key: SensoryStatus; label: string }[] = [
-  { key: "Quiet",    label: "quiet" },
-  { key: "Moderate", label: "moderate" },
-  { key: "Busy",     label: "busy" },
-  { key: "Loud",     label: "loud" },
+  { key: "Empty",       label: "empty" },
+  { key: "Calm",        label: "calm" },
+  { key: "Busy",        label: "busy" },
+  { key: "Crowded",     label: "crowded" },
+  { key: "Overcrowded", label: "overcrowded" },
 ];
 
 const HEADER_BLOCK_HEIGHT = 100;
 const PAGE_COUNT = 4;
+const LIVE_SUMMARY_REFRESH_MS = 60_000;
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
@@ -57,10 +62,11 @@ export default function HomeScreen() {
   const { height: windowHeight } = useWindowDimensions();
   const { prefs } = usePreferences();
   const [counts, setCounts] = useState<Counts>({
-    Quiet: 0,
-    Moderate: 0,
+    Empty: 0,
+    Calm: 0,
     Busy: 0,
-    Loud: 0,
+    Crowded: 0,
+    Overcrowded: 0,
     total: 0,
   });
   const [topPick, setTopPick] = useState<RankedLocation | null>(null);
@@ -70,9 +76,10 @@ export default function HomeScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   const load = useCallback(async () => {
-    const [locations, reports] = await Promise.all([
+    const [locations, reports, crowdLevels] = await Promise.all([
       listLocations(),
-      listAllRecentReports(120),
+      listAllRecentReports(LIVE_REPORT_WINDOW_MINUTES),
+      getCrowdLevels().catch(() => [] as CrowdLevel[]),
     ]);
     const map = new Map<string, Report[]>();
     for (const r of reports) {
@@ -80,22 +87,38 @@ export default function HomeScreen() {
       arr.push(r);
       map.set(r.location_id, arr);
     }
-    const ranked = rankLocations(locations, map, prefs);
+    const ranked = rankLocations(locations, map, prefs, crowdLevelMap(crowdLevels));
     const tally: Counts = {
-      Quiet: 0,
-      Moderate: 0,
+      Empty: 0,
+      Calm: 0,
       Busy: 0,
-      Loud: 0,
+      Crowded: 0,
+      Overcrowded: 0,
       total: ranked.length,
     };
     for (const r of ranked) tally[r.summary.status] += 1;
     setCounts(tally);
-    setTopPick(ranked.find((r) => r.summary.status === "Quiet") ?? ranked[0] ?? null);
+    // Prefer the calmest available space for the daily top pick.
+    setTopPick(
+      ranked.find((r) => r.summary.status === "Empty") ??
+        ranked.find((r) => r.summary.status === "Calm") ??
+        ranked[0] ??
+        null
+    );
     setLoading(false);
   }, [prefs]);
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Re-pull live summaries every minute so CrowdSense + decayed manual
+  // reports don't get stale while the user lingers on the home tab.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      load();
+    }, LIVE_SUMMARY_REFRESH_MS);
+    return () => clearInterval(interval);
   }, [load]);
 
   useFocusEffect(
@@ -115,8 +138,18 @@ export default function HomeScreen() {
     return unsub;
   }, [navigation]);
 
+  // scrollVelocity is the per-tick delta of scrollY. Sign tells us swipe
+  // direction: > 0 = forward (down a page), < 0 = backward. Used by SnapPage
+  // to apply the slow reveal curve only to the slide that's *arriving*,
+  // independent of whether the user is going forward or backward.
+  const prevScrollY = useSharedValue(0);
+  const scrollVelocity = useSharedValue(0);
+
   const onScroll = useAnimatedScrollHandler((e) => {
-    scrollY.value = e.contentOffset.y;
+    const y = e.contentOffset.y;
+    scrollVelocity.value = y - prevScrollY.value;
+    prevScrollY.value = y;
+    scrollY.value = y;
   });
 
   const pageHeight = windowHeight;
@@ -149,15 +182,15 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
-        <SnapPage index={0} pageHeight={pageHeight} insets={insets} scrollY={scrollY}>
+        <SnapPage index={0} pageHeight={pageHeight} insets={insets} scrollY={scrollY} velocity={scrollVelocity}>
           <HeroSlide onBrowse={() => router.push("/spaces")} />
         </SnapPage>
 
-        <SnapPage index={1} pageHeight={pageHeight} insets={insets} scrollY={scrollY}>
+        <SnapPage index={1} pageHeight={pageHeight} insets={insets} scrollY={scrollY} velocity={scrollVelocity}>
           <CampusSlide counts={counts} loading={loading} />
         </SnapPage>
 
-        <SnapPage index={2} pageHeight={pageHeight} insets={insets} scrollY={scrollY}>
+        <SnapPage index={2} pageHeight={pageHeight} insets={insets} scrollY={scrollY} velocity={scrollVelocity}>
           <TopPickSlide
             topPick={topPick}
             onOpen={() =>
@@ -166,7 +199,7 @@ export default function HomeScreen() {
           />
         </SnapPage>
 
-        <SnapPage index={3} pageHeight={pageHeight} insets={insets} scrollY={scrollY}>
+        <SnapPage index={3} pageHeight={pageHeight} insets={insets} scrollY={scrollY} velocity={scrollVelocity}>
           <PrivacySlide onReadMore={() => router.push("/about")} />
         </SnapPage>
       </AnimatedScrollView>
@@ -186,39 +219,69 @@ function SnapPage({
   pageHeight,
   insets,
   scrollY,
+  velocity,
   children,
 }: {
   index: number;
   pageHeight: number;
   insets: { top: number; bottom: number };
   scrollY: Animated.SharedValue<number>;
+  velocity: Animated.SharedValue<number>;
   children: React.ReactNode;
 }) {
   const animStyle = useAnimatedStyle(() => {
-    const distance = Math.abs(scrollY.value / pageHeight - index);
+    // Signed offset: positive = slide is behind us, negative = slide is ahead.
+    const signed = scrollY.value / pageHeight - index;
+    const distance = Math.abs(signed);
 
-    // CRITICAL: pin the slide content to the viewport center by
-    // counter-translating against scrollY. The ScrollView is still moving
-    // underneath (that's how paging works), but the content visually
-    // stays put. no scrolling appearance whatsoever.
+    // Pin the slide content to the viewport center by counter-translating
+    // against scrollY. The ScrollView is still moving underneath, but the
+    // content visually stays put — no scrolling appearance whatsoever.
     const pinTranslateY = scrollY.value - index * pageHeight;
 
-    // The slide is only visible in the last 10% of approach. Outside that
-    // narrow band it's gone, so the viewport sits empty for the bulk of
-    // every swipe. That gap is the "beat" of nothing between slides.
-    const scale = interpolate(
-      distance,
-      [0, 0.03, 0.1, 0.5, 1],
-      [1.0, 1.12, 0.4, 0.2, 0.2],
-      Extrapolation.CLAMP
-    );
+    // A slide is "arriving" when its signed offset is heading toward 0,
+    // i.e. when its sign is opposite the scroll direction. We compute it
+    // from velocity so it works in both forward and backward swipes.
+    //   - forward (vel > 0)  + ahead (signed < 0) → arriving
+    //   - backward (vel < 0) + behind (signed > 0) → arriving
+    // Otherwise the slide is leaving / at rest.
+    const arriving = signed * velocity.value < 0;
 
-    const opacity = interpolate(
-      distance,
-      [0, 0.04, 0.1, 0.5, 1],
-      [1, 0.95, 0, 0, 0],
-      Extrapolation.CLAMP
-    );
+    let scale: number;
+    let opacity: number;
+
+    if (arriving) {
+      // Slow reveal: fade and scale up across most of the swipe so the new
+      // slide eases in instead of popping in at the very end.
+      scale = interpolate(
+        distance,
+        [0, 0.15, 0.4, 0.7, 1],
+        [1.0, 0.95, 0.75, 0.55, 0.4],
+        Extrapolation.CLAMP
+      );
+      opacity = interpolate(
+        distance,
+        [0, 0.15, 0.4, 0.7, 1],
+        [1, 0.85, 0.4, 0.05, 0],
+        Extrapolation.CLAMP
+      );
+    } else {
+      // Snappy disappear: outgoing slide briefly overshoots then collapses
+      // out of view inside the first 10% of the swipe, leaving an empty
+      // viewport "beat" before the next one arrives.
+      scale = interpolate(
+        distance,
+        [0, 0.03, 0.1, 0.5, 1],
+        [1.0, 1.12, 0.4, 0.2, 0.2],
+        Extrapolation.CLAMP
+      );
+      opacity = interpolate(
+        distance,
+        [0, 0.04, 0.1, 0.5, 1],
+        [1, 0.95, 0, 0, 0],
+        Extrapolation.CLAMP
+      );
+    }
 
     return {
       opacity,
@@ -456,6 +519,12 @@ function greeting(): string {
   return "Good evening";
 }
 
+function crowdLevelMap(crowdLevels: CrowdLevel[]): Map<string, CrowdLevel> {
+  const map = new Map<string, CrowdLevel>();
+  for (const level of crowdLevels) map.set(level.zone_id, level);
+  return map;
+}
+
 function pad(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
 }
@@ -634,7 +703,7 @@ const styles = StyleSheet.create({
   },
   pickCategory: {
     fontSize: 16,
-    color: colors.textSubtle,
+    color: colors.text,
     fontWeight: "500",
   },
   pickReasons: {
@@ -671,7 +740,7 @@ const styles = StyleSheet.create({
   },
   pickFooterLabel: {
     fontSize: 13,
-    color: colors.textSubtle,
+    color: colors.text,
     fontWeight: "500",
     marginTop: -2,
   },
@@ -692,7 +761,7 @@ const styles = StyleSheet.create({
   },
   pickFootnote: {
     ...typography.small,
-    color: colors.textSubtle,
+    color: colors.text,
     fontStyle: "italic",
   },
 

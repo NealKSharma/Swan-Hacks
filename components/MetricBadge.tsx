@@ -49,7 +49,13 @@ const styles = StyleSheet.create({
     flexBasis: "45%",
     minWidth: 140,
   },
-  compact: { paddingVertical: 6, paddingHorizontal: 10, minWidth: 100 },
+  compact: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    minWidth: 0,
+    flexBasis: 0,
+    flexShrink: 1,
+  },
   iconWrap: {
     width: 32,
     height: 32,

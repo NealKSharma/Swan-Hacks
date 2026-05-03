@@ -21,14 +21,14 @@ export function TrendBars({
   const byHour = new Map<number, HourlyTrend>();
   for (const t of dayTrends) byHour.set(t.hour, t);
 
-  const empty = dayTrends.length === 0;
-
   return (
     <View style={styles.wrap} accessibilityLabel="Hourly busy-time trend">
       <View style={styles.bars}>
         {HOURS.map((h) => {
           const t = byHour.get(h);
           const v = t ? (t[metric] ?? 0) : 0;
+          // Floor every bar at 6% of track height so the histogram always
+          // reads as a chart, even before any reports arrive for that hour.
           const pct = Math.max(0.06, Math.min(1, v / 5));
           const isHighlight = highlightHour === h;
           return (
@@ -39,7 +39,7 @@ export function TrendBars({
                   {
                     height: `${pct * 100}%`,
                     backgroundColor: isHighlight ? colors.cardinal : colors.accent,
-                    opacity: empty ? 0.15 : isHighlight ? 1 : 0.75,
+                    opacity: isHighlight ? 1 : 0.85,
                   },
                 ]}
               />
@@ -53,22 +53,16 @@ export function TrendBars({
         <Text style={styles.axisLabel}>4p</Text>
         <Text style={styles.axisLabel}>9p</Text>
       </View>
-      {empty && (
-        <Text style={styles.emptyHint}>
-          Not enough reports yet. Trends fill in as students contribute.
-        </Text>
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radii.lg,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     gap: spacing.sm,
   },
   bars: {
@@ -94,5 +88,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   axisLabel: { ...typography.caption, color: colors.textMuted },
-  emptyHint: { ...typography.small, color: colors.textMuted, marginTop: 4 },
 });

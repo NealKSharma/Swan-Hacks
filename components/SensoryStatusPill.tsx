@@ -30,14 +30,16 @@ export function SensoryStatusPill({ status, size = "md", style }: Props) {
 
 function colorFor(status: SensoryStatus): string {
   switch (status) {
-    case "Quiet":
-      return colors.quiet;
-    case "Moderate":
-      return colors.moderate;
+    case "Empty":
+      return colors.empty;
+    case "Calm":
+      return colors.calm;
     case "Busy":
       return colors.busy;
-    case "Loud":
-      return colors.loud;
+    case "Crowded":
+      return colors.crowded;
+    case "Overcrowded":
+      return colors.overcrowded;
   }
 }
 

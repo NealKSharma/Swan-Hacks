@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Link } from "expo-router";
 import { colors, radii, shadows, spacing, typography } from "@/constants/theme";
+import { Icon } from "@/components/Icon";
 import { SensoryStatusPill } from "@/components/SensoryStatusPill";
 import { MetricBadge } from "@/components/MetricBadge";
 import type { Location, SensorySummary } from "@/types";
@@ -19,7 +20,7 @@ export function LocationCard({ location, summary }: Props) {
         style={({ pressed }) => [styles.card, pressed && { opacity: 0.88 }]}
       >
         <View style={styles.header}>
-          <View style={{ flex: 1, paddingRight: spacing.sm }}>
+          <View style={{ flex: 1, paddingRight: spacing.xl }}>
             <Text style={styles.category}>{location.category}</Text>
             <Text style={styles.name}>{location.name}</Text>
           </View>
@@ -29,6 +30,11 @@ export function LocationCard({ location, summary }: Props) {
         <View style={styles.metrics}>
           <MetricBadge metric="noise" value={summary.noise} compact />
           <MetricBadge metric="crowd" value={summary.crowd} compact />
+        </View>
+
+        <View style={styles.cta}>
+          <Text style={styles.ctaText}>Click for details</Text>
+          <Icon name="chevron-right" size={14} color={colors.cardinal} />
         </View>
       </Pressable>
     </Link>
@@ -67,5 +73,18 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: spacing.sm,
     marginTop: 6,
+  },
+  cta: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-end",
+    gap: 2,
+    marginTop: spacing.sm,
+  },
+  ctaText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.cardinal,
+    letterSpacing: 0.2,
   },
 });

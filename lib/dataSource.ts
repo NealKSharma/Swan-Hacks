@@ -8,6 +8,7 @@ import {
   MOCK_REPORTS,
 } from "@/constants/campusLocations";
 import type { HourlyTrend, Location, NewReport, Report } from "@/types";
+import { LIVE_REPORT_WINDOW_MINUTES } from "@/utils/sensoryScore";
 
 export const dataSourceMode: "supabase" | "mock" = supabaseConfigured
   ? "supabase"
@@ -68,7 +69,7 @@ export async function getLocationBySlugOrId(
 
 export async function listRecentReports(
   locationId: string,
-  withinMinutes = 90,
+  withinMinutes = LIVE_REPORT_WINDOW_MINUTES,
   limit = 25
 ): Promise<Report[]> {
   const sb = getSupabase();
@@ -102,7 +103,7 @@ export async function listRecentReports(
 }
 
 export async function listAllRecentReports(
-  withinMinutes = 90
+  withinMinutes = LIVE_REPORT_WINDOW_MINUTES
 ): Promise<Report[]> {
   const sb = getSupabase();
   const cutoff = Date.now() - withinMinutes * 60_000;
@@ -133,9 +134,11 @@ export async function listTrends(locationId: string): Promise<HourlyTrend[]> {
     return [];
   }
 
-  // Popular-time history is derived from real reports, not a prefilled trend
-  // table. Cache the derived buckets for the current local day so opening the
-  // same location repeatedly does not keep scanning the reports table.
+  // Popular-time history is derived from real reports. Postgres now does the
+  // (day_of_week, hour) bucketing with exponential age-decay weighting via
+  // the location_hourly_aggregates view (see migration 20260502_hourly_aggregates).
+  // We cache the derived rows for the current local day so re-opening the same
+  // location is free.
   const dateKey = todayCacheKey();
   const cached = trendCache.get(locationId);
   if (cached?.dateKey === dateKey) {
@@ -143,19 +146,57 @@ export async function listTrends(locationId: string): Promise<HourlyTrend[]> {
   }
 
   const { data, error } = await sb
+    .from("location_hourly_aggregates")
+    .select("location_id, day_of_week, hour, avg_noise, avg_crowd, sample_count")
+    .eq("location_id", locationId);
+
+  if (!error && data) {
+    const trends = (data as AggregateRow[]).map((row) => ({
+      id: `agg-${locationId}-${row.day_of_week}-${row.hour}`,
+      location_id: row.location_id,
+      day_of_week: row.day_of_week,
+      hour: row.hour,
+      avg_noise: row.avg_noise == null ? null : roundTrendAverage(Number(row.avg_noise)),
+      avg_crowd: row.avg_crowd == null ? null : roundTrendAverage(Number(row.avg_crowd)),
+      avg_seating: null,
+      avg_lighting: null,
+      sample_count: row.sample_count ?? 0,
+    }));
+    trends.sort((a, b) => a.day_of_week - b.day_of_week || a.hour - b.hour);
+    trendCache.set(locationId, { dateKey, trends });
+    return trends;
+  }
+
+  // View missing or query failed (e.g. migration not yet applied) — fall back
+  // to the legacy client-side bucketing so the histogram still renders.
+  if (error) {
+    console.warn(
+      "[dataSource] location_hourly_aggregates unavailable, falling back to client bucketing:",
+      error.message
+    );
+  }
+  const { data: rawReports, error: rawErr } = await sb
     .from("reports")
     .select("id, location_id, noise_level, crowd_level, anonymous_session_id, created_at")
     .eq("location_id", locationId)
     .order("created_at", { ascending: false })
     .limit(5000);
-  if (error) {
-    console.warn("[dataSource] listTrends failed:", error.message);
+  if (rawErr) {
+    console.warn("[dataSource] listTrends fallback failed:", rawErr.message);
     return [];
   }
-
-  const trends = buildHourlyTrendsFromReports(locationId, (data ?? []) as Report[]);
+  const trends = buildHourlyTrendsFromReports(locationId, (rawReports ?? []) as Report[]);
   trendCache.set(locationId, { dateKey, trends });
   return trends;
+}
+
+interface AggregateRow {
+  location_id: string;
+  day_of_week: number;
+  hour: number;
+  avg_noise: number | string | null;
+  avg_crowd: number | string | null;
+  sample_count: number | null;
 }
 
 function buildHourlyTrendsFromReports(

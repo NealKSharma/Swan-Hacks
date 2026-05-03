@@ -17,14 +17,21 @@ export const colors = {
   textSubtle: "#5A6472",
   textMuted: "#8A93A0",
 
-  // Sensory status (paired with icons + labels. never color-only)
+  // Sensory status — 5-level crowd-style scale (paired with icons + labels,
+  // never color-only). Old aliases kept so older imports compile.
+  empty: "#2F855A",
+  calm: "#3F8F6E",
+  busy: "#C8A04A",
+  crowded: "#B86E3C",
+  overcrowded: "#9C2A39",
+  // Legacy aliases — do not use in new code.
   quiet: "#3F8F6E",
   moderate: "#C8A04A",
-  busy: "#B86E3C",
   loud: "#9C2A39",
 
   // ISU accents
   cardinal: "#C8102E",          // primary action
+  cardinalLight: "#E25366",     // softer red CTA surface, white-readable
   cardinalDeep: "#A50D26",      // pressed / strong text
   cardinalSoft: "#FBE5E8",      // subtle backgrounds, highlights
   gold: "#F1BE48",              // secondary accent

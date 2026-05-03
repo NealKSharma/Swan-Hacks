@@ -7,10 +7,13 @@ import {
   Text,
   View,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
   interpolateColor,
   useAnimatedStyle,
   useSharedValue,
@@ -23,14 +26,14 @@ import { ScreenFade } from "@/components/ScreenFade";
 import { colors, radii, shadows, spacing, typography } from "@/constants/theme";
 import { listAllRecentReports, listLocations } from "@/lib/dataSource";
 import {
-  checkNearbyStudySpotNow,
-  disableCrowdSense,
-  enableCrowdSense,
+  findClosestHotspot,
   getCrowdLevels,
+  getCurrentCrowdSenseLocation,
   isCrowdSenseEnabled,
   listCrowdSenseHotspots,
 } from "@/services/crowdSense";
 import { rankLocations, RankedLocation } from "@/utils/recommendations";
+import { LIVE_REPORT_WINDOW_MINUTES } from "@/utils/sensoryScore";
 import { usePreferences } from "@/lib/preferencesStore";
 import type { CrowdLevel, Hotspot, Report } from "@/types";
 
@@ -56,9 +59,11 @@ const SORT_LABEL: Record<SortBy, string> = {
   noise: "Noise",
   crowd: "Crowd",
 };
+const LIVE_SUMMARY_REFRESH_MS = 60_000;
 
 export default function SpacesScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { prefs } = usePreferences();
   const [ranked, setRanked] = useState<RankedLocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,19 +76,33 @@ export default function SpacesScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [hotspots, setHotspots] = useState<Hotspot[]>([]);
   const [crowdLevels, setCrowdLevels] = useState<CrowdLevel[]>([]);
-  const [currentLocation, setCurrentLocation] = useState<{
-    latitude: number;
-    longitude: number;
-  } | null>(null);
-  const [selectedHotspotId, setSelectedHotspotId] = useState<string | null>(null);
-  const [crowdSenseEnabled, setCrowdSenseEnabled] = useState(false);
-  const [crowdSenseBusy, setCrowdSenseBusy] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
+  const [closestSpot, setClosestSpot] = useState<{ name: string } | null>(
+    null
+  );
+
+  // Pulls the user's current foreground position and computes the closest
+  // hotspot — but only if location sharing is currently enabled. No-ops
+  // silently otherwise (so we never trigger a permission dialog from this
+  // screen — that's the Preferences toggle's job).
+  const refreshClosestSpot = useCallback(async () => {
+    try {
+      if (!(await isCrowdSenseEnabled())) {
+        setClosestSpot(null);
+        return;
+      }
+      const coords = await getCurrentCrowdSenseLocation();
+      const match = await findClosestHotspot(coords);
+      setClosestSpot(match ? { name: match.hotspot.name } : null);
+    } catch {
+      setClosestSpot(null);
+    }
+  }, []);
 
   const load = useCallback(async () => {
-    const [locations, reports] = await Promise.all([
+    const [locations, reports, levels] = await Promise.all([
       listLocations(),
-      listAllRecentReports(120),
+      listAllRecentReports(LIVE_REPORT_WINDOW_MINUTES),
+      getCrowdLevels().catch(() => [] as CrowdLevel[]),
     ]);
     const map = new Map<string, Report[]>();
     for (const r of reports) {
@@ -91,7 +110,8 @@ export default function SpacesScreen() {
       arr.push(r);
       map.set(r.location_id, arr);
     }
-    setRanked(rankLocations(locations, map, prefs));
+    setCrowdLevels(levels);
+    setRanked(rankLocations(locations, map, prefs, crowdLevelMap(levels)));
     setLoading(false);
   }, [prefs]);
 
@@ -99,43 +119,47 @@ export default function SpacesScreen() {
     load();
   }, [load]);
 
+  // Re-pull live summaries every minute so CrowdSense + decayed manual
+  // reports don't get stale while the user lingers on the spaces tab.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      load();
+    }, LIVE_SUMMARY_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [load]);
+
   useFocusEffect(
     useCallback(() => {
       setStatusBarStyle("dark");
       load();
-    }, [load])
+      // Re-check the closest study space whenever the user comes back to
+      // this tab — this is how toggling location ON in Preferences reflects
+      // here without forcing a list/map round-trip.
+      if (viewMode === "map") {
+        refreshClosestSpot();
+      }
+    }, [load, refreshClosestSpot, viewMode])
   );
 
-  // Lazy-load map data when the user first toggles into Map mode
+  // Lazy-load map data (hotspots + crowd levels) when the user first toggles
+  // into Map mode. Permission for live location lives in Preferences, so we
+  // only attempt a foreground reading here if CrowdSense is already enabled
+  // (no unprompted permission dialog from this screen).
   useEffect(() => {
     if (viewMode !== "map") return;
     let cancelled = false;
     (async () => {
       try {
-        setMapError(null);
-        const [enabled, levels, hotspotRows] = await Promise.all([
-          isCrowdSenseEnabled(),
+        const [levels, hotspotRows] = await Promise.all([
           getCrowdLevels(),
           listCrowdSenseHotspots(),
         ]);
         if (cancelled) return;
-        setCrowdSenseEnabled(enabled);
         setCrowdLevels(levels);
         setHotspots(hotspotRows);
-        if (enabled) {
-          // If the user already has location enabled, sneak a current
-          // position read in without nagging them again.
-          try {
-            const result = await checkNearbyStudySpotNow();
-            if (!cancelled) setCurrentLocation(result.currentLocation);
-          } catch {
-            /* silent — map still renders without my-location dot */
-          }
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setMapError(e instanceof Error ? e.message : "Could not load the map.");
-        }
+        if (!cancelled) await refreshClosestSpot();
+      } catch {
+        /* silent — list mode still works */
       }
     })();
     return () => {
@@ -149,26 +173,13 @@ export default function SpacesScreen() {
     return m;
   }, [crowdLevels]);
 
-  async function toggleCrowdSense(next: boolean) {
-    setCrowdSenseBusy(true);
-    setMapError(null);
-    try {
-      if (next) {
-        await enableCrowdSense();
-        setCrowdSenseEnabled(true);
-        const result = await checkNearbyStudySpotNow();
-        setCurrentLocation(result.currentLocation);
-      } else {
-        await disableCrowdSense();
-        setCrowdSenseEnabled(false);
-        setCurrentLocation(null);
-      }
-    } catch (e) {
-      setMapError(e instanceof Error ? e.message : "Could not toggle location.");
-    } finally {
-      setCrowdSenseBusy(false);
-    }
-  }
+  // Per-location summaries keyed by slug (= zone_id) so the map popups
+  // can show the same status / noise / crowd labels as the list view.
+  const summariesByZone = useMemo(() => {
+    const m = new Map<string, RankedLocation["summary"]>();
+    for (const item of ranked) m.set(item.location.slug, item.summary);
+    return m;
+  }, [ranked]);
 
   const visible = useMemo(() => {
     const sorted = [...ranked];
@@ -206,7 +217,10 @@ export default function SpacesScreen() {
         {/* Fixed header — title left, view-mode toggle right */}
         <View style={styles.header}>
           <View style={styles.headerRow}>
-            <Text style={styles.bigTitle}>SPACES</Text>
+            <View style={styles.titleBlock}>
+              <Text style={styles.bigTitle}>SPACES</Text>
+              <View style={styles.titleRule} />
+            </View>
             <ViewModeToggle
               mode={viewMode}
               onToggle={() =>
@@ -214,107 +228,94 @@ export default function SpacesScreen() {
               }
             />
           </View>
-          <View style={styles.titleRule} />
         </View>
 
-        {viewMode === "list" ? (
-          <>
-            {/* Subtitle + sort dropdown */}
-            <View style={styles.subtitleRow}>
-              <Text style={styles.intro}>
-                Sorted by your preferences and how each space feels right now.
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={`Sort, currently ${sortBtnText}`}
-                onPress={() => setSortOpen(true)}
-                hitSlop={8}
-                style={({ pressed }) => [
-                  styles.filterBtn,
-                  pressed && { opacity: 0.7 },
-                ]}
-              >
-                <Icon name="filter-sort" size={28} color={colors.cardinal} />
-              </Pressable>
-            </View>
-
-            {/* Scrollable list — the only scrollable region in list mode */}
-            <FlatList
-              data={visible}
-              keyExtractor={(item) => item.location.id}
-              renderItem={({ item }) => (
-                <LocationCard
-                  location={item.location}
-                  summary={item.summary}
-                />
-              )}
-              ItemSeparatorComponent={() => (
-                <View style={styles.separator}>
-                  <View style={styles.separatorLine} />
-                </View>
-              )}
-              ListHeaderComponent={<View style={styles.listHead} />}
-              contentContainerStyle={[
-                styles.listContent,
-                { paddingBottom: insets.bottom + 130 },
-              ]}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                loading ? (
-                  <Text style={styles.muted}>Loading…</Text>
-                ) : (
-                  <Text style={styles.muted}>No spaces yet.</Text>
-                )
-              }
-            />
-          </>
-        ) : (
-          // ---- Map mode ----
-          <View
-            style={[
-              styles.mapPanel,
-              { paddingBottom: insets.bottom + 130 },
-            ]}
+        {/* List / Map crossfade. Both modes share the same panel slot via
+            absoluteFill, so toggling the icon fades one out and the other in
+            cleanly without shifting layout. */}
+        <View style={styles.viewModePanel}>
+          <Animated.View
+            key={viewMode}
+            entering={FadeIn.duration(220).easing(Easing.out(Easing.cubic))}
+            exiting={FadeOut.duration(160).easing(Easing.in(Easing.cubic))}
+            style={StyleSheet.absoluteFill}
           >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected: crowdSenseEnabled }}
-              onPress={() => toggleCrowdSense(!crowdSenseEnabled)}
-              disabled={crowdSenseBusy}
-              style={({ pressed }) => [
-                styles.locToggle,
-                crowdSenseEnabled && styles.locToggleOn,
-                pressed && { opacity: 0.85 },
-                crowdSenseBusy && { opacity: 0.65 },
-              ]}
-            >
-              <Text
+            {viewMode === "list" ? (
+              <>
+                {/* Subtitle + sort dropdown */}
+                <View style={styles.subtitleRow}>
+                  <Text style={styles.intro}>
+                    Sorted by your preferences and how each space feels right now.
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Sort, currently ${sortBtnText}`}
+                    onPress={() => setSortOpen(true)}
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                      styles.filterBtn,
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Icon name="filter-sort" size={28} color={colors.cardinal} />
+                  </Pressable>
+                </View>
+
+                {/* Scrollable list — the only scrollable region in list mode */}
+                <FlatList
+                  data={visible}
+                  keyExtractor={(item) => item.location.id}
+                  renderItem={({ item }) => (
+                    <LocationCard
+                      location={item.location}
+                      summary={item.summary}
+                    />
+                  )}
+                  ItemSeparatorComponent={() => (
+                    <View style={styles.separator}>
+                      <View style={styles.separatorLine} />
+                    </View>
+                  )}
+                  ListHeaderComponent={<View style={styles.listHead} />}
+                  contentContainerStyle={[
+                    styles.listContent,
+                    { paddingBottom: insets.bottom + 130 },
+                  ]}
+                  showsVerticalScrollIndicator={false}
+                  ListEmptyComponent={
+                    loading ? (
+                      <Text style={styles.muted}>Loading…</Text>
+                    ) : (
+                      <Text style={styles.muted}>No spaces yet.</Text>
+                    )
+                  }
+                />
+              </>
+            ) : (
+              // ---- Map mode ----
+              <View
                 style={[
-                  styles.locToggleText,
-                  crowdSenseEnabled && styles.locToggleTextOn,
+                  styles.mapPanel,
+                  { paddingBottom: insets.bottom + 130 },
                 ]}
               >
-                {crowdSenseBusy
-                  ? "…"
-                  : crowdSenseEnabled
-                  ? "Location ON  ·  tap to turn off"
-                  : "Use my location"}
-              </Text>
-            </Pressable>
-
-            {mapError && <Text style={styles.errorText}>{mapError}</Text>}
-
-            <View style={styles.mapWrap}>
-              <CrowdSenseMapView
-                hotspots={hotspots}
-                levelsByZone={levelsByZone}
-                currentLocation={currentLocation}
-                selectedHotspotId={selectedHotspotId}
-                onHotspotPress={(id) => setSelectedHotspotId(id)}
-              />
-            </View>
-          </View>
-        )}
+                <View style={styles.mapWrap}>
+                  <CrowdSenseMapView
+                    hotspots={hotspots}
+                    levelsByZone={levelsByZone}
+                    summariesByZone={summariesByZone}
+                    onHotspotOpen={(id) => router.push(`/location/${id}`)}
+                  />
+                </View>
+                {closestSpot ? (
+                  <Text style={styles.closestText}>
+                    Closest study space: {closestSpot.name}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+          </Animated.View>
+        </View>
 
         {/* Sort modal — list mode only */}
         <Modal
@@ -524,6 +525,12 @@ function DirChip({
   );
 }
 
+function crowdLevelMap(crowdLevels: CrowdLevel[]): Map<string, CrowdLevel> {
+  const map = new Map<string, CrowdLevel>();
+  for (const level of crowdLevels) map.set(level.zone_id, level);
+  return map;
+}
+
 // ----------------------------------------------------------------
 // Styles
 // ----------------------------------------------------------------
@@ -551,8 +558,11 @@ const styles = StyleSheet.create({
     letterSpacing: -1.5,
     lineHeight: 48,
   },
+  titleBlock: {
+    gap: 8,
+  },
   titleRule: {
-    width: 80,
+    alignSelf: "stretch",
     height: 5,
     backgroundColor: colors.gold,
     borderRadius: 2.5,
@@ -609,39 +619,31 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
 
+  // Crossfade slot for list / map content. Both modes are absolutely
+  // positioned inside, so toggling fades cleanly without layout shift.
+  viewModePanel: {
+    flex: 1,
+    position: "relative",
+  },
+
   // Map mode
   mapPanel: {
     flex: 1,
     gap: spacing.md,
-  },
-  locToggle: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: radii.pill,
-    backgroundColor: colors.cardinalSoft,
-  },
-  locToggleOn: {
-    backgroundColor: colors.cardinal,
-  },
-  locToggleText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.cardinal,
-    letterSpacing: 0.3,
-  },
-  locToggleTextOn: {
-    color: "#FFFFFF",
-  },
-  errorText: {
-    ...typography.small,
-    color: colors.danger,
+    justifyContent: "center",
   },
   mapWrap: {
-    flex: 1,
     borderRadius: radii.lg,
     overflow: "hidden",
     ...shadows.card,
+  },
+  closestText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.cardinal,
+    letterSpacing: 0.2,
+    textAlign: "center",
+    marginTop: spacing.md,
   },
 
   // Sort modal

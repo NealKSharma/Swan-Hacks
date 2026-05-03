@@ -174,7 +174,7 @@ async function notifyHotspotDetectedOnce(hotspot: Hotspot): Promise<boolean> {
 }
 
 export function crowdLevelForCount(uniqueDevices: number): CrowdLevelLabel {
-  if (uniqueDevices <= 1) return "Quiet";
+  if (uniqueDevices <= 1) return "Empty";
   if (uniqueDevices <= 3) return "Calm";
   if (uniqueDevices <= 8) return "Busy";
   if (uniqueDevices <= 15) return "Crowded";

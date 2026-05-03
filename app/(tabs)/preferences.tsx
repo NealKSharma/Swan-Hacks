@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { setStatusBarStyle } from "expo-status-bar";
@@ -8,10 +8,16 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { ScreenFade } from "@/components/ScreenFade";
 import { colors, radii, shadows, spacing, typography } from "@/constants/theme";
 import { usePreferences } from "@/lib/preferencesStore";
+import {
+  disableCrowdSense,
+  enableCrowdSense,
+  isCrowdSenseEnabled,
+} from "@/services/crowdSense";
 import type { Level } from "@/types";
 
 const LEVELS: Level[] = [1, 2, 3, 4, 5];
@@ -33,8 +39,10 @@ export default function PreferencesScreen() {
       <ScreenFade>
         <View style={[styles.canvas, { paddingTop: insets.top + spacing.xl }]}>
           <View style={styles.header}>
-            <Text style={styles.bigTitle}>PREFERENCES</Text>
-            <View style={styles.titleRule} />
+            <View style={styles.titleBlock}>
+              <Text style={styles.bigTitle}>PREFERENCES</Text>
+              <View style={styles.titleRule} />
+            </View>
           </View>
           <Text style={styles.muted}>Loading…</Text>
         </View>
@@ -54,8 +62,10 @@ export default function PreferencesScreen() {
         ]}
       >
         <View style={styles.header}>
-          <Text style={styles.bigTitle}>PREFERENCES</Text>
-          <View style={styles.titleRule} />
+          <View style={styles.titleBlock}>
+            <Text style={styles.bigTitle}>PREFERENCES</Text>
+            <View style={styles.titleRule} />
+          </View>
           <Text style={styles.intro}>
             CySense uses these to recommend better-fit spaces. Preferences stay
             on your device.
@@ -89,6 +99,8 @@ export default function PreferencesScreen() {
             value={prefs.preferQuiet}
             onChange={(v) => update({ preferQuiet: v })}
           />
+
+          <LocationSharingPill />
         </View>
       </View>
     </ScreenFade>
@@ -214,6 +226,108 @@ function ToggleRow({
 }
 
 // ----------------------------------------------------------------
+// Location-sharing pill — drives CrowdSense on/off via the same services
+// the map view used to call. White when off, cardinalSoft + cardinal text
+// when on. Animated through Reanimated interpolateColor for the colour
+// crossfade plus a spring-driven press scale.
+// ----------------------------------------------------------------
+
+function LocationSharingPill() {
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const sel = useSharedValue(0);
+  const press = useSharedValue(0);
+
+  // Read the current enabled state once on mount so the pill renders in
+  // the right colour on first paint.
+  useEffect(() => {
+    let cancelled = false;
+    isCrowdSenseEnabled()
+      .then((v) => {
+        if (cancelled) return;
+        setEnabled(v);
+        sel.value = v ? 1 : 0;
+      })
+      .catch(() => {
+        /* silent — pill stays Off */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sel]);
+
+  // Drive the colour crossfade whenever the toggle resolves.
+  useEffect(() => {
+    sel.value = withTiming(enabled ? 1 : 0, { duration: 240 });
+  }, [enabled, sel]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      sel.value,
+      [0, 1],
+      [colors.surface, colors.cardinalSoft]
+    ),
+    transform: [{ scale: 1 - press.value * 0.04 }],
+    opacity: 1 - press.value * 0.12,
+  }));
+
+  const labelStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(sel.value, [0, 1], [colors.text, colors.cardinal]),
+  }));
+
+  const dotStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      sel.value,
+      [0, 1],
+      [colors.textMuted, colors.cardinal]
+    ),
+    transform: [{ scale: 1 + sel.value * 0.15 }],
+  }));
+
+  async function toggle() {
+    if (busy) return;
+    setBusy(true);
+    const next = !enabled;
+    try {
+      if (next) {
+        await enableCrowdSense();
+      } else {
+        await disableCrowdSense();
+      }
+      setEnabled(next);
+    } catch {
+      // Permission denied or some other failure — leave state as-is. The
+      // pill colour stays correct because we never optimistically updated.
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <AnimatedPressable
+      accessibilityRole="switch"
+      accessibilityState={{ checked: enabled, busy }}
+      accessibilityLabel="Share my location for nearby spot detection"
+      onPressIn={() => {
+        press.value = withSpring(1, SPRING);
+      }}
+      onPressOut={() => {
+        press.value = withSpring(0, SPRING);
+      }}
+      onPress={toggle}
+      disabled={busy}
+      style={[styles.locationPill, pillStyle]}
+    >
+      <Animated.View style={[styles.locationPillDot, dotStyle]} />
+      <Animated.Text style={[styles.locationPillText, labelStyle]}>
+        {busy ? "…" : enabled ? "Sharing my location" : "Share my location"}
+      </Animated.Text>
+    </AnimatedPressable>
+  );
+}
+
+// ----------------------------------------------------------------
 // Styles
 // ----------------------------------------------------------------
 
@@ -235,8 +349,12 @@ const styles = StyleSheet.create({
     letterSpacing: -1.5,
     lineHeight: 48,
   },
+  titleBlock: {
+    alignSelf: "flex-start",
+    gap: 8,
+  },
   titleRule: {
-    width: 80,
+    alignSelf: "stretch",
     height: 5,
     backgroundColor: colors.gold,
     borderRadius: 2.5,
@@ -289,6 +407,28 @@ const styles = StyleSheet.create({
   },
   cues: { flexDirection: "row", justifyContent: "space-between" },
   cue: { ...typography.caption, color: colors.textMuted },
+
+  // Location-sharing pill
+  locationPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radii.pill,
+    ...shadows.card,
+  },
+  locationPillDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  locationPillText: {
+    fontSize: 15,
+    fontWeight: "700",
+    letterSpacing: 0.3,
+  },
 
   muted: { ...typography.body, color: colors.textMuted, marginTop: spacing.xl },
 });

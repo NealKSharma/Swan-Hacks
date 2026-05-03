@@ -48,7 +48,15 @@ export interface HourlyTrend {
   sample_count: number;
 }
 
-export type SensoryStatus = "Quiet" | "Moderate" | "Busy" | "Loud";
+// 5-level crowd-style overall comfort scale. Labels match the crowd
+// metric so the home-screen tally and the per-card status pill speak
+// the same language.
+export type SensoryStatus =
+  | "Empty"
+  | "Calm"
+  | "Busy"
+  | "Crowded"
+  | "Overcrowded";
 
 export interface SensorySummary {
   status: SensoryStatus;
@@ -121,7 +129,7 @@ export interface NearbyHotspotMatch {
 }
 
 export type CrowdLevelLabel =
-  | "Quiet"
+  | "Empty"
   | "Calm"
   | "Busy"
   | "Crowded"

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -9,10 +9,17 @@ import {
 } from "react-native";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  Easing,
+  interpolateColor,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { Button } from "@/components/Button";
 import { MetricBadge } from "@/components/MetricBadge";
 import { RoomAvailabilityCard } from "@/components/RoomAvailabilityCard";
-import { SensoryStatusPill } from "@/components/SensoryStatusPill";
 import { TrendBars } from "@/components/TrendBars";
 import { ReportForm } from "@/components/ReportForm";
 import { colors, radii, spacing, typography } from "@/constants/theme";
@@ -22,7 +29,8 @@ import {
   listTrends,
 } from "@/lib/dataSource";
 import { getRoomAvailability, locationSupportsRoomAvailability } from "@/lib/libcal";
-import { summarizeReports } from "@/utils/sensoryScore";
+import { getCrowdLevels } from "@/services/crowdSense";
+import { LIVE_REPORT_WINDOW_MINUTES, summarizeReports } from "@/utils/sensoryScore";
 import { timeAgo } from "@/utils/formatting";
 import type {
   HourlyTrend,
@@ -35,6 +43,10 @@ import type {
 type Tab = "info" | "activity" | "rooms";
 
 const POPULAR_TIMES_HOURS = Array.from({ length: 14 }, (_, i) => 8 + i);
+const LIVE_SUMMARY_REFRESH_MS = 60_000;
+const TAB_SPRING = { damping: 18, stiffness: 220, mass: 0.7 };
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function LocationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -50,12 +62,47 @@ export default function LocationDetailScreen() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [roomsLoading, setRoomsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("info");
+  const [activeTab, setActiveTab] = useState<Tab>("activity");
+  const handleTabChange = useCallback((next: Tab) => {
+    setActiveTab(next);
+  }, []);
+
+  // Carousel measurements + animation state.
+  const [panelWidth, setPanelWidth] = useState(0);
+  const translateX = useSharedValue(0);
+  const isFirstLayout = useRef(true);
 
   const supportsRooms = useMemo(
     () => (location ? locationSupportsRoomAvailability(location.slug) : false),
     [location]
   );
+
+  // Tabs that actually render in the carousel (Rooms only when supported).
+  const visibleTabs = useMemo<Tab[]>(
+    () => (supportsRooms ? ["activity", "info", "rooms"] : ["activity", "info"]),
+    [supportsRooms]
+  );
+  const activeIndex = Math.max(0, visibleTabs.indexOf(activeTab));
+
+  // Drive the carousel's translateX from activeIndex × panelWidth. The first
+  // commit (when panelWidth becomes known, or when the screen mounts) is
+  // applied without animation so the page doesn't slide in on initial entry.
+  useEffect(() => {
+    const target = -activeIndex * panelWidth;
+    if (isFirstLayout.current) {
+      translateX.value = target;
+      if (panelWidth > 0) isFirstLayout.current = false;
+    } else {
+      translateX.value = withTiming(target, {
+        duration: 280,
+        easing: Easing.out(Easing.cubic),
+      });
+    }
+  }, [activeIndex, panelWidth, translateX]);
+
+  const carouselStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -67,9 +114,10 @@ export default function LocationDetailScreen() {
       setLoading(false);
       return;
     }
-    const [recent, trendData] = await Promise.all([
-      listRecentReports(loc.id, 120, 25),
+    const [recent, trendData, crowdLevels] = await Promise.all([
+      listRecentReports(loc.id, LIVE_REPORT_WINDOW_MINUTES, 25),
       listTrends(loc.id),
+      getCrowdLevels().catch(() => []),
     ]);
     const hasRooms = locationSupportsRoomAvailability(loc.slug);
     if (hasRooms) setRoomsLoading(true);
@@ -80,7 +128,13 @@ export default function LocationDetailScreen() {
     setLocation(loc);
     setReports(recent);
     setTrends(trendData);
-    setSummary(summarizeReports(recent));
+    setSummary(
+      summarizeReports(
+        recent,
+        new Date(),
+        crowdLevels.find((level) => level.zone_id === loc.slug) ?? null
+      )
+    );
     setLoading(false);
     if (hasRooms) {
       try {
@@ -94,6 +148,15 @@ export default function LocationDetailScreen() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  // Re-pull live summaries every minute so CrowdSense + decayed manual
+  // reports don't drift while the user lingers on the detail page.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      load();
+    }, LIVE_SUMMARY_REFRESH_MS);
+    return () => clearInterval(interval);
   }, [load]);
 
   useFocusEffect(
@@ -132,49 +195,70 @@ export default function LocationDetailScreen() {
 
       {/* Compact header */}
       <View style={styles.header}>
-        <View style={{ flex: 1, paddingRight: spacing.md }}>
+        <View style={styles.headerTitleBlock}>
           <Text style={styles.category}>{location.category}</Text>
           <Text style={styles.title}>{location.name}</Text>
+          <View style={styles.headerRule} />
         </View>
-        <SensoryStatusPill status={summary.status} size="md" />
       </View>
 
       {/* Tab pills */}
       <View style={styles.tabRow}>
         <TabPill
-          label="Info"
-          active={activeTab === "info"}
-          onPress={() => setActiveTab("info")}
-        />
-        <TabPill
           label="Activity"
           active={activeTab === "activity"}
-          onPress={() => setActiveTab("activity")}
+          onPress={() => handleTabChange("activity")}
+        />
+        <TabPill
+          label="Info"
+          active={activeTab === "info"}
+          onPress={() => handleTabChange("info")}
         />
         {supportsRooms && (
           <TabPill
             label="Rooms"
             active={activeTab === "rooms"}
-            onPress={() => setActiveTab("rooms")}
+            onPress={() => handleTabChange("rooms")}
           />
         )}
       </View>
 
-      {/* Static panel — fills remaining space, no scroll */}
-      <View style={styles.panel}>
-        {activeTab === "info" && (
-          <InfoPanel location={location} summary={summary} />
-        )}
-        {activeTab === "activity" && (
-          <ActivityPanel reports={reports} trends={trends} />
-        )}
-        {activeTab === "rooms" && (
-          <View style={{ flex: 1 }}>
-            <RoomAvailabilityCard
-              availability={roomAvailability}
-              loading={roomsLoading}
-            />
-          </View>
+      {/* Tab panel carousel. All visible panels are stacked horizontally inside
+          a translateX-animated row. We slide the row by -index × width — no
+          mount/unmount per tab change, so panels never visually overlap and
+          the initial render doesn't trigger a slide. */}
+      <View
+        style={styles.panel}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          if (w > 0 && w !== panelWidth) setPanelWidth(w);
+        }}
+      >
+        {panelWidth > 0 && (
+          <Animated.View
+            style={[
+              styles.carousel,
+              { width: panelWidth * visibleTabs.length },
+              carouselStyle,
+            ]}
+          >
+            {visibleTabs.map((tab) => (
+              <View key={tab} style={{ width: panelWidth, height: "100%" }}>
+                {tab === "activity" && (
+                  <ActivityPanel trends={trends} summary={summary} />
+                )}
+                {tab === "info" && <InfoPanel location={location} />}
+                {tab === "rooms" && (
+                  <View style={{ flex: 1 }}>
+                    <RoomAvailabilityCard
+                      availability={roomAvailability}
+                      loading={roomsLoading}
+                    />
+                  </View>
+                )}
+              </View>
+            ))}
+          </Animated.View>
         )}
       </View>
 
@@ -232,54 +316,72 @@ function TabPill({
   active: boolean;
   onPress: () => void;
 }) {
+  // Selection drives a 0..1 progress that interpolates the pill bg + text
+  // colour. Press drives a quick scale flick. Both animate independently so
+  // the pill feels responsive even mid-transition.
+  const sel = useSharedValue(active ? 1 : 0);
+  const press = useSharedValue(0);
+
+  useEffect(() => {
+    sel.value = withTiming(active ? 1 : 0, {
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [active, sel]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      sel.value,
+      [0, 1],
+      [colors.surface, colors.cardinal]
+    ),
+    transform: [{ scale: 1 - press.value * 0.05 }],
+  }));
+
+  const textStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(sel.value, [0, 1], [colors.text, "#FFFFFF"]),
+  }));
+
   return (
-    <Pressable
+    <AnimatedPressable
       accessibilityRole="button"
       accessibilityState={{ selected: active }}
+      onPressIn={() => {
+        press.value = withSpring(1, TAB_SPRING);
+      }}
+      onPressOut={() => {
+        press.value = withSpring(0, TAB_SPRING);
+      }}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.tabPill,
-        active && styles.tabPillActive,
-        pressed && !active && { opacity: 0.85 },
-      ]}
+      style={[styles.tabPill, pillStyle]}
     >
-      <Text style={[styles.tabPillText, active && styles.tabPillTextActive]}>
+      <Animated.Text style={[styles.tabPillText, textStyle]}>
         {label}
-      </Text>
-    </Pressable>
+      </Animated.Text>
+    </AnimatedPressable>
   );
 }
 
-function InfoPanel({
-  location,
-  summary,
-}: {
-  location: Location;
-  summary: SensorySummary;
-}) {
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return <Text style={styles.subHeading}>{children}</Text>;
+}
+
+function InfoPanel({ location }: { location: Location }) {
   return (
     <View style={styles.panelInner}>
       {location.description && (
-        <Text style={styles.bodyText} numberOfLines={5}>
-          {location.description}
-        </Text>
+        <View style={styles.infoSection}>
+          <SectionHeading>Background</SectionHeading>
+          <Text style={styles.bodyText} numberOfLines={5}>
+            {location.description}
+          </Text>
+        </View>
       )}
 
-      <View style={styles.metricsGrid}>
-        <MetricBadge metric="noise" value={summary.noise} />
-        <MetricBadge metric="crowd" value={summary.crowd} />
-      </View>
-
-      <Text style={styles.updatedText}>
-        {summary.reportCount > 0
-          ? `${summary.reportCount} report${summary.reportCount === 1 ? "" : "s"} · Updated ${timeAgo(summary.lastReportedAt)}`
-          : "No recent reports yet."}
-      </Text>
-
       {location.accessibility_notes && (
-        <View style={styles.accessibilityBlock}>
-          <Text style={styles.subHeading}>Accessibility</Text>
-          <Text style={styles.bodySmall} numberOfLines={5}>
+        <View style={styles.infoSection}>
+          <SectionHeading>Accessibility</SectionHeading>
+          <Text style={styles.bodyText} numberOfLines={5}>
             {location.accessibility_notes}
           </Text>
         </View>
@@ -289,11 +391,11 @@ function InfoPanel({
 }
 
 function ActivityPanel({
-  reports,
   trends,
+  summary,
 }: {
-  reports: Report[];
   trends: HourlyTrend[];
+  summary: SensorySummary;
 }) {
   const now = new Date();
   const today = now.getDay();
@@ -305,33 +407,28 @@ function ActivityPanel({
 
   return (
     <View style={styles.panelInner}>
-      <Text style={styles.subHeading}>Popular times today</Text>
-      <Text style={styles.subCaption}>{dayLabel(today)}</Text>
-      {predictedTrends.length === 0 ? (
-        <Text style={styles.bodySmall}>No historical trend data yet.</Text>
-      ) : (
-        <TrendBars
-          trends={predictedTrends}
-          dayOfWeek={today}
-          highlightHour={currentHour}
-        />
-      )}
+      {/* Histogram on top */}
+      <SectionHeading>Popular times today</SectionHeading>
+      <TrendBars
+        trends={predictedTrends}
+        dayOfWeek={today}
+        highlightHour={currentHour}
+      />
 
-      <Text style={[styles.subHeading, { marginTop: spacing.lg }]}>
-        Recent anonymous reports
+      {/* Live snapshot beneath the chart */}
+      <View style={{ marginTop: spacing.lg }}>
+        <SectionHeading>Current activity</SectionHeading>
+      </View>
+      <View style={styles.metricsGrid}>
+        <MetricBadge metric="noise" value={summary.noise} />
+        <MetricBadge metric="crowd" value={summary.crowd} />
+      </View>
+
+      <Text style={styles.updatedText}>
+        {summary.reportCount > 0
+          ? `${summary.reportCount} recent report${summary.reportCount === 1 ? "" : "s"} · Updated ${timeAgo(summary.lastReportedAt)}`
+          : "No recent reports yet."}
       </Text>
-      {reports.length === 0 ? (
-        <Text style={styles.bodySmall}>No reports in the last two hours.</Text>
-      ) : (
-        reports.slice(0, 3).map((r) => (
-          <View key={r.id} style={styles.reportRow}>
-            <Text style={styles.reportTime}>{timeAgo(r.created_at)}</Text>
-            <Text style={styles.reportLine}>
-              Noise {r.noise_level}/5 · Crowd {r.crowd_level}/5
-            </Text>
-          </View>
-        ))
-      )}
     </View>
   );
 }
@@ -372,6 +469,14 @@ function predictTodayTrends(
   return predictions.length > 0 ? predictions : trends;
 }
 
+// Bayesian prior: sparsely-sampled cells get pulled toward the neutral
+// midpoint (3 = middle of the 1..5 scale). PRIOR_PSEUDO_COUNT is the number
+// of imaginary "neutral" observations we mix in. Real data quickly dominates
+// once a bucket has more than a couple of reports, but a single 5/5 report
+// no longer produces a wild lonely spike in the histogram.
+const PRIOR_VALUE = 3;
+const PRIOR_PSEUDO_COUNT = 2;
+
 function predictMetric(
   trends: HourlyTrend[],
   dayOfWeek: number,
@@ -408,17 +513,15 @@ function predictMetric(
     return { value: null, weight: 0 };
   }
 
+  // Posterior mean: (Σ wᵢ·xᵢ + α·μ) / (Σ wᵢ + α)
+  const posterior =
+    (weightedTotal + PRIOR_PSEUDO_COUNT * PRIOR_VALUE) /
+    (totalWeight + PRIOR_PSEUDO_COUNT);
+
   return {
-    value: Math.max(1, Math.min(5, weightedTotal / totalWeight)),
+    value: Math.max(1, Math.min(5, posterior)),
     weight: totalWeight,
   };
-}
-
-function dayLabel(d: number): string {
-  return (
-    ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d] ??
-    "Today"
-  );
 }
 
 const styles = StyleSheet.create({
@@ -444,11 +547,12 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
     marginTop: spacing.xs,
     marginBottom: spacing.lg,
+  },
+  headerTitleBlock: {
+    alignSelf: "flex-start",
+    gap: 8,
   },
   category: {
     ...typography.caption,
@@ -465,6 +569,13 @@ const styles = StyleSheet.create({
     lineHeight: 34,
     marginTop: 4,
   },
+  headerRule: {
+    alignSelf: "stretch",
+    height: 5,
+    backgroundColor: colors.gold,
+    borderRadius: 2.5,
+    marginTop: 4,
+  },
 
   // Tab pills
   tabRow: {
@@ -476,17 +587,9 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 18,
     borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-  },
-  tabPillActive: {
-    backgroundColor: colors.cardinal,
   },
   tabPillText: {
     ...typography.bodyStrong,
-    color: colors.text,
-  },
-  tabPillTextActive: {
-    color: "#FFFFFF",
   },
 
   // Panel — flex: 1 so it fills the space between tabs and submit. Overflow
@@ -494,6 +597,10 @@ const styles = StyleSheet.create({
   panel: {
     flex: 1,
     overflow: "hidden",
+  },
+  carousel: {
+    flexDirection: "row",
+    height: "100%",
   },
   panelInner: {
     flex: 1,
@@ -516,12 +623,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     letterSpacing: -0.2,
   },
-  subCaption: {
-    ...typography.small,
-    color: colors.textSubtle,
-    marginTop: -spacing.sm,
-  },
-
   metricsGrid: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -532,18 +633,10 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  accessibilityBlock: {
-    marginTop: spacing.sm,
-    gap: 4,
+  infoSection: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
-
-  // Recent reports
-  reportRow: {
-    paddingVertical: 6,
-    gap: 2,
-  },
-  reportTime: { ...typography.caption, color: colors.textMuted },
-  reportLine: { ...typography.body, color: colors.text },
 
   // Submit row
   submitRow: {

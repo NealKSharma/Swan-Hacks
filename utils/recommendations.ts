@@ -1,4 +1,10 @@
-import type { Location, Report, SensorySummary, UserPreferences } from "@/types";
+import type {
+  CrowdLevel,
+  Location,
+  Report,
+  SensorySummary,
+  UserPreferences,
+} from "@/types";
 import { summarizeReports } from "@/utils/sensoryScore";
 
 export interface RankedLocation {
@@ -11,11 +17,17 @@ export interface RankedLocation {
 export function rankLocations(
   locations: Location[],
   reportsByLocation: Map<string, Report[]>,
-  prefs: UserPreferences
+  prefs: UserPreferences,
+  crowdLevelsByZone: Map<string, CrowdLevel> = new Map()
 ): RankedLocation[] {
+  const now = new Date();
   return locations
     .map((location) => {
-      const summary = summarizeReports(reportsByLocation.get(location.id) ?? []);
+      const summary = summarizeReports(
+        reportsByLocation.get(location.id) ?? [],
+        now,
+        crowdLevelsByZone.get(location.slug) ?? null
+      );
       const { fit, reasons } = preferenceFit(summary, prefs);
       const blended = Math.round(summary.score * 0.7 + fit * 0.3);
       return { location, summary, fit: blended, reasons };

@@ -62,8 +62,10 @@ export default function AboutScreen() {
         pointerEvents="box-none"
         style={[styles.persistentHeader, { paddingTop: insets.top + spacing.xl }]}
       >
-        <Text style={styles.bigAbout}>ABOUT</Text>
-        <View style={styles.aboutRule} />
+        <View style={styles.aboutTitleBlock}>
+          <Text style={styles.bigAbout}>ABOUT</Text>
+          <View style={styles.aboutRule} />
+        </View>
       </View>
 
       <AnimatedScrollView
@@ -205,7 +207,7 @@ function PageDot({
 
 function SlideEyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <View style={{ gap: 10 }}>
+    <View style={styles.slideEyebrowBlock}>
       <Text style={styles.sectionEyebrow}>{children}</Text>
       <View style={styles.eyebrowRule} />
     </View>
@@ -348,12 +350,15 @@ const styles = StyleSheet.create({
     letterSpacing: -1.5,
     lineHeight: 48,
   },
+  aboutTitleBlock: {
+    alignSelf: "flex-start",
+    gap: 10,
+  },
   aboutRule: {
-    width: 80,
+    alignSelf: "stretch",
     height: 5,
     backgroundColor: colors.gold,
     borderRadius: 2.5,
-    marginTop: 10,
   },
 
   pageDots: {
@@ -381,8 +386,12 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     fontWeight: "700",
   },
+  slideEyebrowBlock: {
+    alignSelf: "flex-start",
+    gap: 10,
+  },
   eyebrowRule: {
-    width: 44,
+    alignSelf: "stretch",
     height: 4,
     backgroundColor: colors.gold,
     borderRadius: 2,

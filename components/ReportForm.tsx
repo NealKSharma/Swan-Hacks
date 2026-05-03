@@ -22,10 +22,15 @@ import {
   GestureHandlerRootView,
 } from "react-native-gesture-handler";
 import Animated, {
+  Easing,
+  cancelAnimation,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
+  withSequence,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
@@ -44,6 +49,8 @@ const NOISE_MEASURE_MS = 2000;
 const NOISE_SAMPLE_MS = 100;
 
 const SPRING = { damping: 18, stiffness: 220, mass: 0.7 };
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function ReportForm({
   locationId,
@@ -66,6 +73,32 @@ export function ReportForm({
   const noiseRecordingRef = useRef<Audio.Recording | null>(null);
 
   const trackHeight = Math.max(260, Math.min(360, windowHeight * 0.38));
+
+  // Record-button animation: a quick press scale, plus a steady pulse while
+  // the mic is reading.
+  const recordPress = useSharedValue(0);
+  const recordPulse = useSharedValue(1);
+
+  useEffect(() => {
+    if (measuring) {
+      recordPulse.value = withRepeat(
+        withSequence(
+          withTiming(1.06, { duration: 520, easing: Easing.inOut(Easing.quad) }),
+          withTiming(1.0, { duration: 520, easing: Easing.inOut(Easing.quad) })
+        ),
+        -1,
+        false
+      );
+    } else {
+      cancelAnimation(recordPulse);
+      recordPulse.value = withTiming(1, { duration: 180 });
+    }
+  }, [measuring, recordPulse]);
+
+  const recordBtnAnim = useAnimatedStyle(() => ({
+    transform: [{ scale: recordPulse.value * (1 - recordPress.value * 0.04) }],
+    opacity: 1 - recordPress.value * 0.12,
+  }));
 
   useEffect(() => {
     return () => {
@@ -175,11 +208,12 @@ export function ReportForm({
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={[styles.sheet, { paddingTop: insets.top + spacing.md }]}>
+      <View style={[styles.sheet, { paddingTop: insets.top - spacing.md }]}>
         <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
+          <View style={styles.headerTitleCol}>
             <Text style={styles.eyebrow}>Quick report</Text>
             <Text style={styles.title}>{locationName}</Text>
+            <View style={styles.headerRule} />
           </View>
           <Pressable
             accessibilityRole="button"
@@ -193,8 +227,6 @@ export function ReportForm({
             <Text style={styles.closePillText}>Close</Text>
           </Pressable>
         </View>
-
-        <View style={styles.headerRule} />
 
         {success ? (
           <View style={styles.successBlock}>
@@ -237,15 +269,21 @@ export function ReportForm({
               />
             </View>
 
-            <Pressable
+            <AnimatedPressable
               accessibilityRole="button"
               disabled={measuring || submitting}
+              onPressIn={() => {
+                recordPress.value = withSpring(1, SPRING);
+              }}
+              onPressOut={() => {
+                recordPress.value = withSpring(0, SPRING);
+              }}
               onPress={handleMeasureNoise}
-              style={({ pressed }) => [
+              style={[
                 styles.measureBtn,
                 measuring && styles.measureBtnActive,
-                pressed && !measuring && { opacity: 0.92 },
-                (measuring || submitting) && { opacity: 0.85 },
+                submitting && { opacity: 0.85 },
+                recordBtnAnim,
               ]}
             >
               <Icon
@@ -261,7 +299,7 @@ export function ReportForm({
               >
                 {measuring ? "Listening…" : "Record live audio level"}
               </Text>
-            </Pressable>
+            </AnimatedPressable>
 
             <Text style={styles.measureHint}>
               {detectedDb != null
@@ -356,12 +394,15 @@ function VerticalSlider({
       dragging.value = true;
       pressed.value = withSpring(1, SPRING);
 
-      // Tap-to-jump: thumb center snaps directly under the finger.
-      const target = Math.max(0, Math.min(height, e.y));
-      centerY.value = target;
-      startCenter.value = target;
+      // Tap-to-snap: thumb jumps to the nearest level under the finger,
+      // not the exact tap position. If this becomes a drag, onUpdate will
+      // override with the live finger position.
+      const tap = Math.max(0, Math.min(height, e.y));
+      const idx = Math.max(0, Math.min(4, Math.round(tap / step)));
+      const snapped = idx * step;
+      centerY.value = withSpring(snapped, SPRING);
+      startCenter.value = snapped;
 
-      const idx = Math.round(target / step);
       if (idx !== lastIdx.value) {
         lastIdx.value = idx;
         const v = Math.max(1, Math.min(5, 5 - idx));
@@ -369,10 +410,9 @@ function VerticalSlider({
       }
     })
     .onUpdate((e) => {
-      const newCenter = Math.max(
-        0,
-        Math.min(height, startCenter.value + e.translationY)
-      );
+      // Follow the finger absolutely during a drag. onEnd snaps to the
+      // nearest level on release.
+      const newCenter = Math.max(0, Math.min(height, e.y));
       centerY.value = newCenter;
 
       const idx = Math.round(newCenter / step);
@@ -487,13 +527,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
+    gap: spacing.md,
   },
 
   headerRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: spacing.md,
+  },
+  headerTitleCol: {
+    flex: 1,
+    paddingTop: spacing.xs,
   },
   eyebrow: {
     ...typography.caption,
@@ -522,10 +566,10 @@ const styles = StyleSheet.create({
   },
   headerRule: {
     height: 4,
-    width: 64,
+    alignSelf: "stretch",
     backgroundColor: colors.gold,
     borderRadius: 2,
-    marginTop: -spacing.sm,
+    marginTop: spacing.xs,
   },
 
   // Sliders
@@ -533,7 +577,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 28,
+    gap: 64,
   },
   sliderCol: {
     alignItems: "center",
