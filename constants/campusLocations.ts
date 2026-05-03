@@ -24,6 +24,7 @@ export const MOCK_LOCATIONS: Location[] = [
     libcal_lid: 14797,
     libcal_gid: 0,
     libcal_capacity: 0,
+    hotspot_radius_meters: 65,
     created_at: ISO_NOW(),
   },
   {
@@ -42,6 +43,7 @@ export const MOCK_LOCATIONS: Location[] = [
     libcal_lid: 15606,
     libcal_gid: 38061,
     libcal_capacity: 0,
+    hotspot_radius_meters: 55,
     created_at: ISO_NOW(),
   },
   {
@@ -55,6 +57,7 @@ export const MOCK_LOCATIONS: Location[] = [
     longitude: -93.645,
     accessibility_notes:
       "Multiple step-free entrances. Elevators to all floors. Quieter lounges on upper levels.",
+    hotspot_radius_meters: 80,
     created_at: ISO_NOW(),
   },
   {
@@ -67,6 +70,7 @@ export const MOCK_LOCATIONS: Location[] = [
     latitude: 42.0265,
     longitude: -93.6535,
     accessibility_notes: "Step-free entries on north and south sides. Elevators available.",
+    hotspot_radius_meters: 50,
     created_at: ISO_NOW(),
   },
   {
@@ -79,6 +83,7 @@ export const MOCK_LOCATIONS: Location[] = [
     latitude: 42.0249,
     longitude: -93.6493,
     accessibility_notes: "Step-free entry. Elevator access. Lobby seating near windows.",
+    hotspot_radius_meters: 45,
     created_at: ISO_NOW(),
   },
   {
@@ -90,6 +95,7 @@ export const MOCK_LOCATIONS: Location[] = [
     latitude: 42.0237,
     longitude: -93.6517,
     accessibility_notes: "Step-free entry. Booth and table seating. Trays accessible at lower height.",
+    hotspot_radius_meters: 60,
     created_at: ISO_NOW(),
   },
   {
@@ -103,6 +109,7 @@ export const MOCK_LOCATIONS: Location[] = [
     longitude: -93.6541,
     accessibility_notes:
       "Step-free entry. Elevators to upper floors. Adaptive equipment available. Ask at the desk.",
+    hotspot_radius_meters: 70,
     created_at: ISO_NOW(),
   },
   {
@@ -114,6 +121,7 @@ export const MOCK_LOCATIONS: Location[] = [
     latitude: 42.0294,
     longitude: -93.6555,
     accessibility_notes: "Step-free entry. Elevators throughout. Quieter pockets on upper studio floors.",
+    hotspot_radius_meters: 60,
     created_at: ISO_NOW(),
   },
   {
@@ -125,6 +133,7 @@ export const MOCK_LOCATIONS: Location[] = [
     latitude: 42.0299,
     longitude: -93.651,
     accessibility_notes: "Step-free entries. Elevator near central staircase.",
+    hotspot_radius_meters: 50,
     created_at: ISO_NOW(),
   },
   {
@@ -136,6 +145,7 @@ export const MOCK_LOCATIONS: Location[] = [
     latitude: 42.0265,
     longitude: -93.6481,
     accessibility_notes: "Step-free entry on north side. Elevator available.",
+    hotspot_radius_meters: 55,
     created_at: ISO_NOW(),
   },
   {
@@ -148,6 +158,7 @@ export const MOCK_LOCATIONS: Location[] = [
     latitude: 42.0263,
     longitude: -93.647,
     accessibility_notes: "Step-free entry. Elevators throughout. Outdoor courtyard seating.",
+    hotspot_radius_meters: 55,
     created_at: ISO_NOW(),
   },
   {
@@ -161,6 +172,7 @@ export const MOCK_LOCATIONS: Location[] = [
     longitude: -93.6485,
     accessibility_notes:
       "Paved paths throughout. Benches at intervals. No covered shelter; weather-dependent.",
+    hotspot_radius_meters: 90,
     created_at: ISO_NOW(),
   },
 ];

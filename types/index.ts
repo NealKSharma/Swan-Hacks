@@ -21,6 +21,7 @@ export interface Location {
   libcal_lid?: number | null;
   libcal_gid?: number | null;
   libcal_capacity?: number | null;
+  hotspot_radius_meters?: number | null;
   created_at: string;
 }
 
@@ -99,4 +100,36 @@ export interface RoomAvailabilityResponse {
   booking_page_url: string;
   note?: string | null;
   groups: RoomAvailabilityGroup[];
+}
+
+// ----------------------------------------------------------------
+// CrowdSense (opt-in location + map view, from teammate's branch)
+// ----------------------------------------------------------------
+
+export interface Hotspot {
+  id: string;
+  name: string;
+  category: string;
+  latitude: number;
+  longitude: number;
+  radiusMeters: number;
+}
+
+export interface NearbyHotspotMatch {
+  hotspot: Hotspot;
+  distanceMeters: number;
+}
+
+export type CrowdLevelLabel =
+  | "Quiet"
+  | "Calm"
+  | "Busy"
+  | "Crowded"
+  | "Overcrowded";
+
+export interface CrowdLevel {
+  zone_id: string;
+  unique_devices: number;
+  level: CrowdLevelLabel;
+  last_seen_at: string | null;
 }

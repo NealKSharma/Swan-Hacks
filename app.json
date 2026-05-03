@@ -16,14 +16,38 @@
       "supportsTablet": true,
       "bundleIdentifier": "edu.iastate.cysense",
       "associatedDomains": ["applinks:cysense.app"],
-      "icon": "./assets/logos/cysense_app_icon.png"
+      "icon": "./assets/logos/cysense_app_icon.png",
+      "infoPlist": {
+        "UIBackgroundModes": ["location"]
+      }
+    },
+    "android": {
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/logos/cysense_app_icon.png"
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CySense uses your location to check whether you are near a campus study hotspot right now.",
+          "locationAlwaysAndWhenInUsePermission": "CySense can use anonymous background location snapshots to estimate how busy campus study spaces are.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
+    ],
     "experiments": {
       "typedRoutes": false
     }

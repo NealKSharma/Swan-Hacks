@@ -16,6 +16,8 @@ import NavHome from "@/assets/icons/nav-home.svg";
 import NavCompass from "@/assets/icons/nav-compass.svg";
 import NavFilter from "@/assets/icons/nav-filter.svg";
 import NavInfo from "@/assets/icons/nav-info.svg";
+import SpacesList from "@/assets/icons/spaces-list.svg";
+import SpacesMap from "@/assets/icons/spaces-map.svg";
 
 export type IconName =
   | "metric-noise"
@@ -24,6 +26,8 @@ export type IconName =
   | "metric-lighting"
   | "chevron-right"
   | "filter-sort"
+  | "spaces-list"
+  | "spaces-map"
   | "tab-home"
   | "tab-spaces"
   | "tab-preferences"
@@ -42,6 +46,8 @@ const ICONS: Record<IconName, ComponentType<SvgProps>> = {
   "metric-lighting": MetricLighting,
   "chevron-right": ChevronRight,
   "filter-sort": FilterSort,
+  "spaces-list": SpacesList,
+  "spaces-map": SpacesMap,
   "tab-home": NavHome,
   "tab-spaces": NavCompass,
   "tab-preferences": NavFilter,

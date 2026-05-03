@@ -16,20 +16,30 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { CrowdSenseMapView } from "@/components/CrowdSenseMapView";
 import { Icon } from "@/components/Icon";
 import { LocationCard } from "@/components/LocationCard";
 import { ScreenFade } from "@/components/ScreenFade";
 import { colors, radii, shadows, spacing, typography } from "@/constants/theme";
 import { listAllRecentReports, listLocations } from "@/lib/dataSource";
+import {
+  checkNearbyStudySpotNow,
+  disableCrowdSense,
+  enableCrowdSense,
+  getCrowdLevels,
+  isCrowdSenseEnabled,
+  listCrowdSenseHotspots,
+} from "@/services/crowdSense";
 import { rankLocations, RankedLocation } from "@/utils/recommendations";
 import { usePreferences } from "@/lib/preferencesStore";
-import type { Report } from "@/types";
+import type { CrowdLevel, Hotspot, Report } from "@/types";
 
 const SPRING = { damping: 16, stiffness: 220, mass: 0.7 };
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type SortBy = "recommended" | "name" | "type" | "noise" | "crowd";
 type SortDir = "asc" | "desc";
+type ViewMode = "list" | "map";
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: "recommended", label: "Recommended" },
@@ -57,6 +67,19 @@ export default function SpacesScreen() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [sortOpen, setSortOpen] = useState(false);
 
+  // ---- CrowdSense map view state (additive — does not affect list mode) ----
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [hotspots, setHotspots] = useState<Hotspot[]>([]);
+  const [crowdLevels, setCrowdLevels] = useState<CrowdLevel[]>([]);
+  const [currentLocation, setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [selectedHotspotId, setSelectedHotspotId] = useState<string | null>(null);
+  const [crowdSenseEnabled, setCrowdSenseEnabled] = useState(false);
+  const [crowdSenseBusy, setCrowdSenseBusy] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     const [locations, reports] = await Promise.all([
       listLocations(),
@@ -83,11 +106,74 @@ export default function SpacesScreen() {
     }, [load])
   );
 
+  // Lazy-load map data when the user first toggles into Map mode
+  useEffect(() => {
+    if (viewMode !== "map") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setMapError(null);
+        const [enabled, levels, hotspotRows] = await Promise.all([
+          isCrowdSenseEnabled(),
+          getCrowdLevels(),
+          listCrowdSenseHotspots(),
+        ]);
+        if (cancelled) return;
+        setCrowdSenseEnabled(enabled);
+        setCrowdLevels(levels);
+        setHotspots(hotspotRows);
+        if (enabled) {
+          // If the user already has location enabled, sneak a current
+          // position read in without nagging them again.
+          try {
+            const result = await checkNearbyStudySpotNow();
+            if (!cancelled) setCurrentLocation(result.currentLocation);
+          } catch {
+            /* silent — map still renders without my-location dot */
+          }
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setMapError(e instanceof Error ? e.message : "Could not load the map.");
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [viewMode]);
+
+  const levelsByZone = useMemo(() => {
+    const m = new Map<string, CrowdLevel>();
+    for (const l of crowdLevels) m.set(l.zone_id, l);
+    return m;
+  }, [crowdLevels]);
+
+  async function toggleCrowdSense(next: boolean) {
+    setCrowdSenseBusy(true);
+    setMapError(null);
+    try {
+      if (next) {
+        await enableCrowdSense();
+        setCrowdSenseEnabled(true);
+        const result = await checkNearbyStudySpotNow();
+        setCurrentLocation(result.currentLocation);
+      } else {
+        await disableCrowdSense();
+        setCrowdSenseEnabled(false);
+        setCurrentLocation(null);
+      }
+    } catch (e) {
+      setMapError(e instanceof Error ? e.message : "Could not toggle location.");
+    } finally {
+      setCrowdSenseBusy(false);
+    }
+  }
+
   const visible = useMemo(() => {
     const sorted = [...ranked];
     switch (sortBy) {
       case "recommended":
-        // already sorted by fit (highest first) from rankLocations
         break;
       case "name":
         sorted.sort((a, b) => a.location.name.localeCompare(b.location.name));
@@ -117,59 +203,120 @@ export default function SpacesScreen() {
   return (
     <ScreenFade>
       <View style={[styles.canvas, { paddingTop: insets.top + spacing.xl }]}>
-        {/* Fixed header */}
+        {/* Fixed header — title left, view-mode toggle right */}
         <View style={styles.header}>
-          <Text style={styles.bigTitle}>SPACES</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.bigTitle}>SPACES</Text>
+            <ViewModeToggle
+              mode={viewMode}
+              onToggle={() =>
+                setViewMode(viewMode === "list" ? "map" : "list")
+              }
+            />
+          </View>
           <View style={styles.titleRule} />
         </View>
 
-        {/* Subtitle + sort dropdown */}
-        <View style={styles.subtitleRow}>
-          <Text style={styles.intro}>
-            Sorted by your preferences and how each space feels right now.
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Sort, currently ${sortBtnText}`}
-            onPress={() => setSortOpen(true)}
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.filterBtn,
-              pressed && { opacity: 0.7 },
+        {viewMode === "list" ? (
+          <>
+            {/* Subtitle + sort dropdown */}
+            <View style={styles.subtitleRow}>
+              <Text style={styles.intro}>
+                Sorted by your preferences and how each space feels right now.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Sort, currently ${sortBtnText}`}
+                onPress={() => setSortOpen(true)}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.filterBtn,
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Icon name="filter-sort" size={28} color={colors.cardinal} />
+              </Pressable>
+            </View>
+
+            {/* Scrollable list — the only scrollable region in list mode */}
+            <FlatList
+              data={visible}
+              keyExtractor={(item) => item.location.id}
+              renderItem={({ item }) => (
+                <LocationCard
+                  location={item.location}
+                  summary={item.summary}
+                />
+              )}
+              ItemSeparatorComponent={() => (
+                <View style={styles.separator}>
+                  <View style={styles.separatorLine} />
+                </View>
+              )}
+              ListHeaderComponent={<View style={styles.listHead} />}
+              contentContainerStyle={[
+                styles.listContent,
+                { paddingBottom: insets.bottom + 130 },
+              ]}
+              showsVerticalScrollIndicator={false}
+              ListEmptyComponent={
+                loading ? (
+                  <Text style={styles.muted}>Loading…</Text>
+                ) : (
+                  <Text style={styles.muted}>No spaces yet.</Text>
+                )
+              }
+            />
+          </>
+        ) : (
+          // ---- Map mode ----
+          <View
+            style={[
+              styles.mapPanel,
+              { paddingBottom: insets.bottom + 130 },
             ]}
           >
-            <Icon name="filter-sort" size={40} color={colors.cardinal} />
-          </Pressable>
-        </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: crowdSenseEnabled }}
+              onPress={() => toggleCrowdSense(!crowdSenseEnabled)}
+              disabled={crowdSenseBusy}
+              style={({ pressed }) => [
+                styles.locToggle,
+                crowdSenseEnabled && styles.locToggleOn,
+                pressed && { opacity: 0.85 },
+                crowdSenseBusy && { opacity: 0.65 },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.locToggleText,
+                  crowdSenseEnabled && styles.locToggleTextOn,
+                ]}
+              >
+                {crowdSenseBusy
+                  ? "…"
+                  : crowdSenseEnabled
+                  ? "Location ON  ·  tap to turn off"
+                  : "Use my location"}
+              </Text>
+            </Pressable>
 
-        {/* Scrollable list — only scroll region on the screen */}
-        <FlatList
-          data={visible}
-          keyExtractor={(item) => item.location.id}
-          renderItem={({ item }) => (
-            <LocationCard location={item.location} summary={item.summary} />
-          )}
-          ItemSeparatorComponent={() => (
-            <View style={styles.separator}>
-              <View style={styles.separatorLine} />
+            {mapError && <Text style={styles.errorText}>{mapError}</Text>}
+
+            <View style={styles.mapWrap}>
+              <CrowdSenseMapView
+                hotspots={hotspots}
+                levelsByZone={levelsByZone}
+                currentLocation={currentLocation}
+                selectedHotspotId={selectedHotspotId}
+                onHotspotPress={(id) => setSelectedHotspotId(id)}
+              />
             </View>
-          )}
-          ListHeaderComponent={<View style={styles.listHead} />}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: insets.bottom + 130 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            loading ? (
-              <Text style={styles.muted}>Loading…</Text>
-            ) : (
-              <Text style={styles.muted}>No spaces yet.</Text>
-            )
-          }
-        />
+          </View>
+        )}
 
-        {/* Sort modal */}
+        {/* Sort modal — list mode only */}
         <Modal
           visible={sortOpen}
           transparent
@@ -229,7 +376,58 @@ export default function SpacesScreen() {
   );
 }
 
-// Animated sort-by row — bg + text + check dot crossfade on selection.
+// ----------------------------------------------------------------
+// View-mode toggle (icon in title row — flips between list/map)
+// ----------------------------------------------------------------
+
+function ViewModeToggle({
+  mode,
+  onToggle,
+}: {
+  mode: ViewMode;
+  onToggle: () => void;
+}) {
+  // The icon shown is the mode you would switch TO.
+  const nextIcon = mode === "list" ? "spaces-map" : "spaces-list";
+  const press = useSharedValue(0);
+  const pop = useSharedValue(1);
+
+  // Quick pop animation whenever the mode changes.
+  useEffect(() => {
+    pop.value = 0.85;
+    pop.value = withSpring(1, SPRING);
+  }, [mode, pop]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pop.value * (1 - press.value * 0.08) }],
+    opacity: 1 - press.value * 0.25,
+  }));
+
+  return (
+    <AnimatedPressable
+      accessibilityRole="button"
+      accessibilityLabel={
+        mode === "list" ? "Switch to map view" : "Switch to list view"
+      }
+      onPressIn={() => {
+        press.value = withSpring(1, SPRING);
+      }}
+      onPressOut={() => {
+        press.value = withSpring(0, SPRING);
+      }}
+      onPress={onToggle}
+      hitSlop={12}
+      style={[styles.viewToggleBtn, animStyle]}
+    >
+      <Icon name={nextIcon} size={26} color={colors.cardinal} />
+    </AnimatedPressable>
+  );
+}
+
+// ----------------------------------------------------------------
+// Sort modal animated rows
+// ----------------------------------------------------------------
+
 function SortOptionRow({
   label,
   selected,
@@ -241,11 +439,9 @@ function SortOptionRow({
 }) {
   const sel = useSharedValue(selected ? 1 : 0);
   const press = useSharedValue(0);
-
   useEffect(() => {
     sel.value = withSpring(selected ? 1 : 0, SPRING);
   }, [selected, sel]);
-
   const rowStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       sel.value,
@@ -254,17 +450,14 @@ function SortOptionRow({
     ),
     transform: [{ scale: 1 - 0.02 * press.value }],
   }));
-
   const labelStyle = useAnimatedStyle(() => ({
     color: interpolateColor(sel.value, [0, 1], [colors.text, colors.cardinal]),
     fontWeight: sel.value > 0.5 ? "700" : "500",
   }));
-
   const dotStyle = useAnimatedStyle(() => ({
     transform: [{ scale: sel.value }],
     opacity: sel.value,
   }));
-
   return (
     <AnimatedPressable
       accessibilityRole="button"
@@ -286,7 +479,6 @@ function SortOptionRow({
   );
 }
 
-// Animated direction chip — bg color + text color crossfade on toggle.
 function DirChip({
   label,
   active,
@@ -298,11 +490,9 @@ function DirChip({
 }) {
   const sel = useSharedValue(active ? 1 : 0);
   const press = useSharedValue(0);
-
   useEffect(() => {
     sel.value = withSpring(active ? 1 : 0, SPRING);
   }, [active, sel]);
-
   const chipStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       sel.value,
@@ -311,11 +501,9 @@ function DirChip({
     ),
     transform: [{ scale: 1 + 0.02 * sel.value - 0.04 * press.value }],
   }));
-
   const textStyle = useAnimatedStyle(() => ({
     color: interpolateColor(sel.value, [0, 1], [colors.text, "#FFFFFF"]),
   }));
-
   return (
     <AnimatedPressable
       accessibilityRole="button"
@@ -336,6 +524,10 @@ function DirChip({
   );
 }
 
+// ----------------------------------------------------------------
+// Styles
+// ----------------------------------------------------------------
+
 const styles = StyleSheet.create({
   canvas: {
     flex: 1,
@@ -343,10 +535,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
   },
 
-  // Header
   header: {
     gap: 8,
     paddingBottom: spacing.md,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   bigTitle: {
     fontSize: 44,
@@ -362,7 +558,16 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
   },
 
-  // Subtitle + sort
+  // List / Map view-mode toggle (icon button in title row)
+  viewToggleBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.cardinalSoft,
+  },
+
   subtitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -404,6 +609,41 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xl,
   },
 
+  // Map mode
+  mapPanel: {
+    flex: 1,
+    gap: spacing.md,
+  },
+  locToggle: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: radii.pill,
+    backgroundColor: colors.cardinalSoft,
+  },
+  locToggleOn: {
+    backgroundColor: colors.cardinal,
+  },
+  locToggleText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.cardinal,
+    letterSpacing: 0.3,
+  },
+  locToggleTextOn: {
+    color: "#FFFFFF",
+  },
+  errorText: {
+    ...typography.small,
+    color: colors.danger,
+  },
+  mapWrap: {
+    flex: 1,
+    borderRadius: radii.lg,
+    overflow: "hidden",
+    ...shadows.card,
+  },
+
   // Sort modal
   modalRoot: {
     flex: 1,
@@ -439,7 +679,6 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 16,
-    // color + weight are driven by Reanimated useAnimatedStyle
   },
   optionCheck: {
     width: 10,
@@ -457,13 +696,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: radii.pill,
     alignItems: "center",
-    // background color driven by Reanimated useAnimatedStyle
   },
   dirChipText: {
     fontSize: 14,
     fontWeight: "700",
     letterSpacing: 0.4,
-    // color driven by Reanimated useAnimatedStyle
   },
 
   doneBtn: {
