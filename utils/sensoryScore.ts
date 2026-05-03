@@ -1,4 +1,16 @@
-import type { HourlyTrend, Report, SensorySummary, SensoryStatus } from "@/types";
+import type {
+  CrowdLevel,
+  CrowdLevelLabel,
+  HourlyTrend,
+  Report,
+  SensorySummary,
+  SensoryStatus,
+} from "@/types";
+
+export const LIVE_REPORT_WINDOW_MINUTES = 120;
+export const REPORT_DECAY_HALF_LIFE_MINUTES = 45;
+export const CROWDSENSE_CROWD_WEIGHT = 0.8;
+export const MANUAL_CROWD_WEIGHT = 0.2;
 
 /**
  * Compute a 0..100 "sensory comfort" score from averaged metrics.
@@ -36,28 +48,32 @@ export function statusFromScore(score: number): SensoryStatus {
   return "Loud";
 }
 
-export function summarizeReports(reports: Report[]): SensorySummary {
-  const count = reports.length;
+export function summarizeReports(
+  reports: Report[],
+  now: Date = new Date(),
+  crowdSenseLevel: CrowdLevel | null = null
+): SensorySummary {
+  const liveReports = reports.filter((report) => isLiveReport(report, now));
+  const count = liveReports.length;
   if (count === 0) {
-    const score = scoreFromAverages({ noise: null, crowd: null });
+    const crowd = crowdSenseCrowdValue(crowdSenseLevel);
+    const score = scoreFromAverages({ noise: null, crowd });
     return {
       status: statusFromScore(score),
       score,
       noise: null,
-      crowd: null,
+      crowd,
       reportCount: 0,
       lastReportedAt: null,
     };
   }
 
-  const avg = (key: "noise_level" | "crowd_level") =>
-    reports.reduce((sum, r) => sum + r[key], 0) / count;
-
-  const noise = avg("noise_level");
-  const crowd = avg("crowd_level");
+  const noise = timeWeightedAverage(liveReports, "noise_level", now);
+  const manualCrowd = timeWeightedAverage(liveReports, "crowd_level", now);
+  const crowd = blendedCrowdValue(manualCrowd, crowdSenseLevel);
   const score = scoreFromAverages({ noise, crowd });
 
-  const lastReportedAt = reports
+  const lastReportedAt = liveReports
     .map((r) => r.created_at)
     .sort()
     .at(-1)!;
@@ -70,6 +86,71 @@ export function summarizeReports(reports: Report[]): SensorySummary {
     reportCount: count,
     lastReportedAt,
   };
+}
+
+function blendedCrowdValue(
+  manualCrowd: number | null,
+  crowdSenseLevel: CrowdLevel | null
+): number | null {
+  const crowdSenseCrowd = crowdSenseCrowdValue(crowdSenseLevel);
+  if (crowdSenseCrowd == null) return manualCrowd;
+  if (manualCrowd == null) return crowdSenseCrowd;
+
+  return (
+    crowdSenseCrowd * CROWDSENSE_CROWD_WEIGHT +
+    manualCrowd * MANUAL_CROWD_WEIGHT
+  );
+}
+
+function crowdSenseCrowdValue(crowdSenseLevel: CrowdLevel | null): number | null {
+  if (!crowdSenseLevel || crowdSenseLevel.last_seen_at == null) return null;
+  return crowdLevelLabelValue(crowdSenseLevel.level);
+}
+
+function crowdLevelLabelValue(level: CrowdLevelLabel): number {
+  switch (level) {
+    case "Quiet":
+      return 1;
+    case "Calm":
+      return 2;
+    case "Busy":
+      return 3;
+    case "Crowded":
+      return 4;
+    case "Overcrowded":
+      return 5;
+  }
+}
+
+function isLiveReport(report: Report, now: Date): boolean {
+  const reportedAtMs = new Date(report.created_at).getTime();
+  if (Number.isNaN(reportedAtMs)) return false;
+
+  const ageMinutes = Math.max(0, (now.getTime() - reportedAtMs) / 60_000);
+  return ageMinutes <= LIVE_REPORT_WINDOW_MINUTES;
+}
+
+function timeWeightedAverage(
+  reports: Report[],
+  key: "noise_level" | "crowd_level",
+  now: Date
+): number | null {
+  const nowMs = now.getTime();
+  let weightedTotal = 0;
+  let totalWeight = 0;
+
+  for (const report of reports) {
+    const reportedAtMs = new Date(report.created_at).getTime();
+    if (Number.isNaN(reportedAtMs)) continue;
+
+    const ageMinutes = Math.max(0, (nowMs - reportedAtMs) / 60_000);
+    const weight = 0.5 ** (ageMinutes / REPORT_DECAY_HALF_LIFE_MINUTES);
+    weightedTotal += report[key] * weight;
+    totalWeight += weight;
+  }
+
+  if (totalWeight === 0) return null;
+  return weightedTotal / totalWeight;
 }
 
 export function summarizeTrendForHour(

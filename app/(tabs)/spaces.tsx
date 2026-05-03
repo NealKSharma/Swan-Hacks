@@ -31,6 +31,7 @@ import {
   listCrowdSenseHotspots,
 } from "@/services/crowdSense";
 import { rankLocations, RankedLocation } from "@/utils/recommendations";
+import { LIVE_REPORT_WINDOW_MINUTES } from "@/utils/sensoryScore";
 import { usePreferences } from "@/lib/preferencesStore";
 import type { CrowdLevel, Hotspot, Report } from "@/types";
 
@@ -56,6 +57,7 @@ const SORT_LABEL: Record<SortBy, string> = {
   noise: "Noise",
   crowd: "Crowd",
 };
+const LIVE_SUMMARY_REFRESH_MS = 60_000;
 
 export default function SpacesScreen() {
   const insets = useSafeAreaInsets();
@@ -81,9 +83,10 @@ export default function SpacesScreen() {
   const [mapError, setMapError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [locations, reports] = await Promise.all([
+    const [locations, reports, levels] = await Promise.all([
       listLocations(),
-      listAllRecentReports(120),
+      listAllRecentReports(LIVE_REPORT_WINDOW_MINUTES),
+      getCrowdLevels().catch(() => []),
     ]);
     const map = new Map<string, Report[]>();
     for (const r of reports) {
@@ -91,12 +94,21 @@ export default function SpacesScreen() {
       arr.push(r);
       map.set(r.location_id, arr);
     }
-    setRanked(rankLocations(locations, map, prefs));
+    setCrowdLevels(levels);
+    setRanked(rankLocations(locations, map, prefs, crowdLevelMap(levels)));
     setLoading(false);
   }, [prefs]);
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      load();
+    }, LIVE_SUMMARY_REFRESH_MS);
+
+    return () => clearInterval(interval);
   }, [load]);
 
   useFocusEffect(
@@ -148,6 +160,12 @@ export default function SpacesScreen() {
     for (const l of crowdLevels) m.set(l.zone_id, l);
     return m;
   }, [crowdLevels]);
+
+  const summariesByZone = useMemo(() => {
+    const m = new Map<string, RankedLocation["summary"]>();
+    for (const item of ranked) m.set(item.location.slug, item.summary);
+    return m;
+  }, [ranked]);
 
   async function toggleCrowdSense(next: boolean) {
     setCrowdSenseBusy(true);
@@ -308,6 +326,7 @@ export default function SpacesScreen() {
               <CrowdSenseMapView
                 hotspots={hotspots}
                 levelsByZone={levelsByZone}
+                summariesByZone={summariesByZone}
                 currentLocation={currentLocation}
                 selectedHotspotId={selectedHotspotId}
                 onHotspotPress={(id) => setSelectedHotspotId(id)}
@@ -522,6 +541,12 @@ function DirChip({
       </Animated.Text>
     </AnimatedPressable>
   );
+}
+
+function crowdLevelMap(crowdLevels: CrowdLevel[]): Map<string, CrowdLevel> {
+  const map = new Map<string, CrowdLevel>();
+  for (const level of crowdLevels) map.set(level.zone_id, level);
+  return map;
 }
 
 // ----------------------------------------------------------------

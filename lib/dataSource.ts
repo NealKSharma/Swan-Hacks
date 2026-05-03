@@ -8,6 +8,7 @@ import {
   MOCK_REPORTS,
 } from "@/constants/campusLocations";
 import type { HourlyTrend, Location, NewReport, Report } from "@/types";
+import { LIVE_REPORT_WINDOW_MINUTES } from "@/utils/sensoryScore";
 
 export const dataSourceMode: "supabase" | "mock" = supabaseConfigured
   ? "supabase"
@@ -68,7 +69,7 @@ export async function getLocationBySlugOrId(
 
 export async function listRecentReports(
   locationId: string,
-  withinMinutes = 90,
+  withinMinutes = LIVE_REPORT_WINDOW_MINUTES,
   limit = 25
 ): Promise<Report[]> {
   const sb = getSupabase();
@@ -102,7 +103,7 @@ export async function listRecentReports(
 }
 
 export async function listAllRecentReports(
-  withinMinutes = 90
+  withinMinutes = LIVE_REPORT_WINDOW_MINUTES
 ): Promise<Report[]> {
   const sb = getSupabase();
   const cutoff = Date.now() - withinMinutes * 60_000;

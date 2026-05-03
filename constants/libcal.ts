@@ -194,12 +194,10 @@ export function buildMockRoomAvailability(
   }));
 
   return {
-    location_slug: slug,
-    location_name: config.locationName,
+    slug,
     date,
     booking_page_url: config.sources[0]?.bookingPageUrl ?? "",
     fetched_at: new Date().toISOString(),
-    source: "mock",
     note: "Showing demo room openings because the LibCal backend is not configured.",
     groups,
   };

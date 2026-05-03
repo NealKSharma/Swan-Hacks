@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
-import type { CrowdLevel, Hotspot } from "@/types";
+import { levelLabel } from "@/utils/formatting";
+import type { CrowdLevel, Hotspot, SensorySummary } from "@/types";
 
 interface CrowdSenseMapViewProps {
   hotspots: Hotspot[];
   levelsByZone: Map<string, CrowdLevel>;
+  summariesByZone?: Map<string, SensorySummary>;
   currentLocation: {
     latitude: number;
     longitude: number;
@@ -17,6 +19,7 @@ interface CrowdSenseMapViewProps {
 export function CrowdSenseMapView({
   hotspots,
   levelsByZone,
+  summariesByZone,
   currentLocation,
   selectedHotspotId,
   onHotspotPress,
@@ -27,11 +30,12 @@ export function CrowdSenseMapView({
         hotspots: hotspots.map((hotspot) => ({
           ...hotspot,
           level: levelsByZone.get(hotspot.id)?.level ?? "Quiet",
+          summary: summariesByZone?.get(hotspot.id) ?? null,
         })),
         currentLocation,
         selectedHotspotId,
       }),
-    [currentLocation, hotspots, levelsByZone, selectedHotspotId]
+    [currentLocation, hotspots, levelsByZone, selectedHotspotId, summariesByZone]
   );
 
   useEffect(() => {
@@ -121,7 +125,12 @@ function buildMapHtml({
   currentLocation,
   selectedHotspotId,
 }: {
-  hotspots: Array<Hotspot & { level: CrowdLevel["level"] }>;
+  hotspots: Array<
+    Hotspot & {
+      level: CrowdLevel["level"];
+      summary: SensorySummary | null;
+    }
+  >;
   currentLocation: { latitude: number; longitude: number } | null;
   selectedHotspotId: string | null;
 }) {
@@ -148,6 +157,9 @@ function buildMapHtml({
       longitude: hotspot.longitude,
       radiusMeters: hotspot.radiusMeters,
       level: hotspot.level,
+      status: hotspot.summary?.status ?? "Quiet",
+      noiseText: levelLabel("noise", hotspot.summary?.noise ?? null),
+      crowdText: levelLabel("crowd", hotspot.summary?.crowd ?? null),
       color: markerColor(hotspot.level),
       selected: hotspot.id === selectedHotspotId,
     }))
@@ -238,6 +250,9 @@ function buildMapHtml({
         .bindTooltip(hotspot.name + ' - ' + hotspot.level, { direction: 'top', offset: [0, -12] })
         .bindPopup(
           '<div class="popup-title">' + hotspot.name + '</div>' +
+          '<div class="popup-line">Status: ' + hotspot.status + '</div>' +
+          '<div class="popup-line">Noise: ' + hotspot.noiseText + '</div>' +
+          '<div class="popup-line">Crowd: ' + hotspot.crowdText + '</div>' +
           '<div class="popup-line">Quiet level: ' + quietLevelText(hotspot.level) + '</div>' +
           '<div class="popup-line">Crowdedness: ' + crowdednessText(hotspot.level) + '</div>' +
           '<div class="popup-line">Tap again to open details.</div>'

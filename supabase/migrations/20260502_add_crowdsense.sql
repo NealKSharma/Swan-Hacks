@@ -48,9 +48,9 @@ as $$
       when count(distinct s.anon_device_id) <= 15 then 'Crowded'
       else 'Overcrowded'
     end as level,
-    max(s.created_at) as last_seen_at
+    max(s.time_bucket) as last_seen_at
   from public.crowdsense_snapshots s
-  where s.created_at >= now() - make_interval(mins => greatest(window_minutes, 1))
+  where s.time_bucket >= now() - make_interval(mins => greatest(window_minutes, 1))
   group by s.zone_id;
 $$;
 

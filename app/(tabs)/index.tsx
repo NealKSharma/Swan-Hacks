@@ -13,6 +13,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   Extrapolation,
+  type SharedValue,
   interpolate,
   useAnimatedScrollHandler,
   useAnimatedStyle,
@@ -26,9 +27,11 @@ import {
   listAllRecentReports,
   listLocations,
 } from "@/lib/dataSource";
+import { getCrowdLevels } from "@/services/crowdSense";
 import { rankLocations, RankedLocation } from "@/utils/recommendations";
+import { LIVE_REPORT_WINDOW_MINUTES } from "@/utils/sensoryScore";
 import { usePreferences } from "@/lib/preferencesStore";
-import type { Report, SensoryStatus } from "@/types";
+import type { CrowdLevel, Report, SensoryStatus } from "@/types";
 
 interface Counts {
   Quiet: number;
@@ -47,6 +50,7 @@ const STAT_ROWS: { key: SensoryStatus; label: string }[] = [
 
 const HEADER_BLOCK_HEIGHT = 100;
 const PAGE_COUNT = 4;
+const LIVE_SUMMARY_REFRESH_MS = 60_000;
 
 const AnimatedScrollView = Animated.createAnimatedComponent(ScrollView);
 
@@ -70,9 +74,10 @@ export default function HomeScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   const load = useCallback(async () => {
-    const [locations, reports] = await Promise.all([
+    const [locations, reports, crowdLevels] = await Promise.all([
       listLocations(),
-      listAllRecentReports(120),
+      listAllRecentReports(LIVE_REPORT_WINDOW_MINUTES),
+      getCrowdLevels().catch(() => []),
     ]);
     const map = new Map<string, Report[]>();
     for (const r of reports) {
@@ -80,7 +85,8 @@ export default function HomeScreen() {
       arr.push(r);
       map.set(r.location_id, arr);
     }
-    const ranked = rankLocations(locations, map, prefs);
+    const crowdLevelsByZone = crowdLevelMap(crowdLevels);
+    const ranked = rankLocations(locations, map, prefs, crowdLevelsByZone);
     const tally: Counts = {
       Quiet: 0,
       Moderate: 0,
@@ -96,6 +102,14 @@ export default function HomeScreen() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      load();
+    }, LIVE_SUMMARY_REFRESH_MS);
+
+    return () => clearInterval(interval);
   }, [load]);
 
   useFocusEffect(
@@ -191,7 +205,7 @@ function SnapPage({
   index: number;
   pageHeight: number;
   insets: { top: number; bottom: number };
-  scrollY: Animated.SharedValue<number>;
+  scrollY: SharedValue<number>;
   children: React.ReactNode;
 }) {
   const animStyle = useAnimatedStyle(() => {
@@ -254,7 +268,7 @@ function PageDots({
   pageHeight,
 }: {
   count: number;
-  scrollY: Animated.SharedValue<number>;
+  scrollY: SharedValue<number>;
   pageHeight: number;
 }) {
   return (
@@ -272,7 +286,7 @@ function PageDot({
   pageHeight,
 }: {
   index: number;
-  scrollY: Animated.SharedValue<number>;
+  scrollY: SharedValue<number>;
   pageHeight: number;
 }) {
   const animStyle = useAnimatedStyle(() => {
@@ -458,6 +472,12 @@ function greeting(): string {
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : `${n}`;
+}
+
+function crowdLevelMap(crowdLevels: CrowdLevel[]): Map<string, CrowdLevel> {
+  const map = new Map<string, CrowdLevel>();
+  for (const level of crowdLevels) map.set(level.zone_id, level);
+  return map;
 }
 
 const styles = StyleSheet.create({

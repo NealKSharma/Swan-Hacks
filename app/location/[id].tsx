@@ -22,7 +22,8 @@ import {
   listTrends,
 } from "@/lib/dataSource";
 import { getRoomAvailability, locationSupportsRoomAvailability } from "@/lib/libcal";
-import { summarizeReports } from "@/utils/sensoryScore";
+import { getCrowdLevels } from "@/services/crowdSense";
+import { LIVE_REPORT_WINDOW_MINUTES, summarizeReports } from "@/utils/sensoryScore";
 import { timeAgo } from "@/utils/formatting";
 import type {
   HourlyTrend,
@@ -35,6 +36,7 @@ import type {
 type Tab = "info" | "activity" | "rooms";
 
 const POPULAR_TIMES_HOURS = Array.from({ length: 14 }, (_, i) => 8 + i);
+const LIVE_SUMMARY_REFRESH_MS = 60_000;
 
 export default function LocationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -67,9 +69,10 @@ export default function LocationDetailScreen() {
       setLoading(false);
       return;
     }
-    const [recent, trendData] = await Promise.all([
-      listRecentReports(loc.id, 120, 25),
+    const [recent, trendData, crowdLevels] = await Promise.all([
+      listRecentReports(loc.id, LIVE_REPORT_WINDOW_MINUTES, 25),
       listTrends(loc.id),
+      getCrowdLevels().catch(() => []),
     ]);
     const hasRooms = locationSupportsRoomAvailability(loc.slug);
     if (hasRooms) setRoomsLoading(true);
@@ -80,7 +83,13 @@ export default function LocationDetailScreen() {
     setLocation(loc);
     setReports(recent);
     setTrends(trendData);
-    setSummary(summarizeReports(recent));
+    setSummary(
+      summarizeReports(
+        recent,
+        new Date(),
+        crowdLevels.find((level) => level.zone_id === loc.slug) ?? null
+      )
+    );
     setLoading(false);
     if (hasRooms) {
       try {
@@ -94,6 +103,14 @@ export default function LocationDetailScreen() {
 
   useEffect(() => {
     load();
+  }, [load]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      load();
+    }, LIVE_SUMMARY_REFRESH_MS);
+
+    return () => clearInterval(interval);
   }, [load]);
 
   useFocusEffect(
