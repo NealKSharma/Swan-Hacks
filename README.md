@@ -8,13 +8,14 @@ Click the image above to watch the CySense demo on YouTube.
 ---
 
 ## Pictures
-<img width="200" alt="Home Screen" src="pictures/Home Screen.jpg" />
-<img width="200" alt="Spaces - List" src="pictures/Spaces.png" />
-<img width="200" alt="Spaces - Map" src="pictures/Map.png" />
-<img width="200" alt="Howe Hall" src="pictures/Howe Hall.jpg" />
-<img width="200" alt="SIC Rooms" src="pictures/SIC Rooms.png" />
-<img width="200" alt="Preferences" src="pictures/Preferences.png" />
 
+| Home Screen | Spaces - List | Spaces - Map |
+|---|---|---|
+| <img width="200" alt="Home Screen" src="pictures/Home%20Screen.jpg" /> | <img width="200" alt="Spaces - List" src="pictures/Spaces.png" /> | <img width="200" alt="Spaces - Map" src="pictures/Map.png" /> |
+
+| Howe Hall | SIC Rooms | Preferences |
+|---|---|---|
+| <img width="200" alt="Howe Hall" src="pictures/Howe%20Hall.jpg" /> | <img width="200" alt="SIC Rooms" src="pictures/SIC%20Rooms.png" /> | <img width="200" alt="Preferences" src="pictures/Preferences.png" /> |
 ---
 
 ## Features
